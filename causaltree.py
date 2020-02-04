@@ -123,7 +123,9 @@ def _retrieve_index(index, index_sorted, split_index):
     return left_index, right_index, global_split_index
 
 
-def _find_optimal_split(y, t, x, index, metric, weight_loss, min_leaf, level):
+def _find_optimal_split(
+        y, t, x, index, metric, loss_weighting, min_leaf, level
+):
     """
     Given the data (`y`, `t`, `x`) finds optimal splitting point in the
     feature space given the observations selected in `index` and a metric
@@ -166,7 +168,7 @@ def _find_optimal_split(y, t, x, index, metric, weight_loss, min_leaf, level):
             left_loss = metric(yy_transformed[:(i+1)], left_te)
             right_loss = metric(yy_transformed[(i+1):], right_te)
 
-            global_loss = weight_loss(
+            global_loss = loss_weighting(
                 left_loss, right_loss, i+1, len(yy)-i-1
             )
             if global_loss < loss:
@@ -191,7 +193,7 @@ def _find_optimal_split(y, t, x, index, metric, weight_loss, min_leaf, level):
     return left, right, split_information
 
 
-def _fit(y, t, x, index, metric, min_leaf, level=0):
+def _fit(y, t, x, index, metric, loss_weighting, min_leaf, level=0):
     """
     Core function which recursively splits the feature space until stopping
     criterium is reached (`min_leaf`) and returns splitting information.
@@ -208,7 +210,9 @@ def _fit(y, t, x, index, metric, min_leaf, level=0):
     :return:
     """
     out = np.array([]).reshape((-1, 5))
-    tmp = _find_optimal_split(y, t, x, index, metric, min_leaf, level)
+    tmp = _find_optimal_split(
+        y, t, x, index, metric, loss_weighting, min_leaf, level
+    )
     if tmp is None:
         return out
     else:
@@ -217,8 +221,12 @@ def _fit(y, t, x, index, metric, min_leaf, level=0):
         level_left = level + 1
         level_right = level + 1
 
-        out_left = _fit(y, t, x, left, metric, min_leaf, level_left)
-        out_right = _fit(y, t, x, right, metric, min_leaf, level_right)
+        out_left = _fit(
+            y, t, x, left, metric, loss_weighting, min_leaf, level_left
+        )
+        out_right = _fit(
+            y, t, x, right, metric, loss_weighting, min_leaf, level_right
+        )
 
         if out_left.size != 0:
             out = np.concatenate((out, out_left), axis=0)
@@ -228,24 +236,35 @@ def _fit(y, t, x, index, metric, min_leaf, level=0):
         return out
 
 
-def fitcausaltree(y, t, x, metric, min_leaf):
+def fitcausaltree(y, t, x, min_leaf, metric=None, loss_weighting=None):
     """
     Wrapper function for core function _fit.
 
     :param y: (n,) np.array containing dependent variable
     :param t: (n,) np.array containing treatment status
     :param x: (n,p) np.array containing independent variables
-    :param metric: a distance function, e.g. l2 loss
     :param min_leaf: minimum number of either treated or untreated observations
                     to be in a leaf after the split
+    :param metric: a distance function, e.g. l2 loss
+    :param loss_weighting: a function which computes the global loss of a split
+                        by combining the losses in each subset using weights
+                        given by the no. of obersavtions falling in the
+                        respective subset.
     :return:
-
     TODO:
         1) Implement assert statements for data types
     """
     n = len(y)
     index = np.full((n,), True)
 
-    tree = _fit(y, t, x, index, metric, min_leaf)
+    if metric is None:
+        def metric(outcomes, estimate):
+            return np.sum((outcomes - estimate) ** 2)
+
+    if loss_weighting is None:
+        def loss_weighting(left_loss, right_loss, w1, w2):
+            return left_loss + right_loss
+
+    tree = _fit(y, t, x, index, metric, loss_weighting, min_leaf)
 
     return tree
