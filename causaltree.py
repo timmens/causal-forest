@@ -42,10 +42,10 @@ def _compute_potential_splitting_points(t, min_leaf):
         right_untreated = tmp[0]
     right = nn - 1 - max(right_treated, right_untreated)
 
-    if left > right:
+    if left > right - 1:
         return range(0)
     else:
-        return range(left, right)
+        return range(left, right - 1)
 
 
 def _transform_outcome(y, t):
@@ -72,6 +72,25 @@ def _estimate_treatment_effect(y, t):
     :return: float scalar representing estimated treatment effect
     """
     return y[t].mean() - y[~t].mean()
+
+
+def _weight_loss(left_loss, right_loss, n_left, n_right):
+    """
+    Given loss in a left leaf (`left_loss`)  and right leaf (`right_loss`) and
+    the number of observations falling in the left and right leaf, `n_left` and
+    `n_right`, respectively, computes a weighted combination of the losses
+    and returns a single scalar output.
+
+    :param left_loss: loss in left leaf
+    :param right_loss: loss in right leaf
+    :param n_left: no. of observations falling in left leaf
+    :param n_right: no. of observations falling in right leaf
+    :return: weightes loss scalar (float)
+    """
+    left = (n_left / (n_left + n_right)) * left_loss
+    right = (n_right / (n_left + n_right)) * right_loss
+
+    return left + right
 
 
 def _retrieve_index(index, index_sorted, split_index):
@@ -104,11 +123,12 @@ def _retrieve_index(index, index_sorted, split_index):
     return left_index, right_index, global_split_index
 
 
-def _find_optimal_split(y, t, x, index, metric, min_leaf, level):
+def _find_optimal_split(y, t, x, index, metric, weight_loss, min_leaf, level):
     """
     Given the data (`y`, `t`, `x`) finds optimal splitting point in the
     feature space given the observations selected in `index` and a metric
-    `metric`. Note that the algorithm is very similar to finding a minimum.
+    `metric`. Note that the algorithm is the standard implementation of the
+    recursive binary splitting algorithm for decision trees.
     TODO: 1) computation of global loss as convex combination?
 
     :param y: (n,) np.array containing dependent variable
@@ -143,10 +163,12 @@ def _find_optimal_split(y, t, x, index, metric, min_leaf, level):
             left_te = _estimate_treatment_effect(yy[:(i+1)], tt[:(i+1)])
             right_te = _estimate_treatment_effect(yy[(i+1):], tt[(i+1):])
 
-            left_loss = metric(yy_transformed, left_te)
-            right_loss = metric(yy_transformed, right_te)
+            left_loss = metric(yy_transformed[:(i+1)], left_te)
+            right_loss = metric(yy_transformed[(i+1):], right_te)
 
-            global_loss = left_loss + right_loss
+            global_loss = weight_loss(
+                left_loss, right_loss, i+1, len(yy)-i-1
+            )
             if global_loss < loss:
                 split_var = j
                 split_value = xx[i]
@@ -159,10 +181,12 @@ def _find_optimal_split(y, t, x, index, metric, min_leaf, level):
 
     # create index of observations falling in left and right leaf, respectively
     index_sorted = np.argsort(x[index, split_var])
-    left, right, split = _retrieve_index(index, index_sorted, split_index)
+    left, right, split_index = _retrieve_index(index, index_sorted, split_index)
 
     # store split information
-    split_information = np.array([split_var, split_value, split, loss, level])
+    split_information = np.array(
+        [split_var, split_value, split_index, loss, level]
+    )
 
     return left, right, split_information
 
@@ -215,6 +239,9 @@ def fitcausaltree(y, t, x, metric, min_leaf):
     :param min_leaf: minimum number of either treated or untreated observations
                     to be in a leaf after the split
     :return:
+
+    TODO:
+        1) Implement assert statements for data types
     """
     n = len(y)
     index = np.full((n,), True)
