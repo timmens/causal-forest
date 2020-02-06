@@ -99,9 +99,6 @@ def _retrieve_index(index, index_sorted, split_index):
     `index_sorted` (index of length of sum of True values in `index`) and
     `split_index` (index of `index_sorted` where the split should occur),
     computes new index left and new index right corresponding to the split.
-    TODO:
-        1) check if it should be index_sorted[:split_index] or
-            index_sorted[:(split_index + 1)]
 
     :param index: (n,) np.array (bool)
     :param index_sorted:
@@ -131,7 +128,6 @@ def _find_optimal_split(
     feature space given the observations selected in `index` and a metric
     `metric`. Note that the algorithm is the standard implementation of the
     recursive binary splitting algorithm for decision trees.
-    TODO: 1) computation of global loss as convex combination?
 
     :param y: (n,) np.array containing dependent variable
     :param t: (n,) np.array (bool) containing treatment status
@@ -177,17 +173,19 @@ def _find_optimal_split(
                 split_index = i
                 loss = global_loss
 
-    # check if any split has occured
+    # check if any split has occured.
     if loss == np.inf:
         return None
 
     # create index of observations falling in left and right leaf, respectively
     index_sorted = np.argsort(x[index, split_var])
-    left, right, split_index = _retrieve_index(index, index_sorted, split_index)
+    left, right, split_index = _retrieve_index(
+        index, index_sorted, split_index
+    )
 
     # store split information
     split_information = np.array(
-        [split_var, split_value, split_index, loss, level]
+        [split_var, split_value, split_index, loss, level, np.nan]
     )
 
     return left, right, split_information
@@ -209,23 +207,25 @@ def _fit(y, t, x, index, metric, loss_weighting, min_leaf, level=0):
                     to be in a leaf after the split
     :return:
     """
-    out = np.array([]).reshape((-1, 5))
+    out = np.array([]).reshape((-1, 6))
     tmp = _find_optimal_split(
         y, t, x, index, metric, loss_weighting, min_leaf, level
     )
     if tmp is None:
+        # if we do not split, the node must be a leaf, hence we add the
+        # treatment effect
+        te = _estimate_treatment_effect(y[index], t[index])
+        out = np.array(5 * [np.nan] + [te]).reshape((-1, 6))
         return out
     else:
         left, right, split_information = tmp
         out = np.concatenate((out, split_information.reshape((1, -1))), axis=0)
-        level_left = level + 1
-        level_right = level + 1
 
         out_left = _fit(
-            y, t, x, left, metric, loss_weighting, min_leaf, level_left
+            y, t, x, left, metric, loss_weighting, min_leaf, level + 1
         )
         out_right = _fit(
-            y, t, x, right, metric, loss_weighting, min_leaf, level_right
+            y, t, x, right, metric, loss_weighting, min_leaf, level + 1
         )
 
         if out_left.size != 0:
@@ -268,3 +268,15 @@ def fitcausaltree(y, t, x, min_leaf, metric=None, loss_weighting=None):
     tree = _fit(y, t, x, index, metric, loss_weighting, min_leaf)
 
     return tree
+
+
+def predictcausaltree(ctree, x):
+    """
+    Predicts new outcomes using a fitted causal tree `ctree` from new features
+    `x`.
+
+    :param ctree: a fitted causal tree
+    :param x: new covariates from which we want to predict outcomes
+    :return: predicted outcomes
+    """
+    pass
