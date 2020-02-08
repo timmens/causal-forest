@@ -6,6 +6,36 @@
 import numpy as np
 
 
+# Delete?
+#
+#def _compute_maximum_number_nodes(n, min_leaf):
+#    """
+#    Computes the maximum number of nodes in a valid binary tree when there are
+#    `n` observations and the minimum number of observations (of one treatment
+#    status) is set to `min_leaf`.
+#
+#    :param n: number of observations in a data set
+#    :param min_leaf: minimum number of obs. in a leaf of one treatment type
+#    :return: (int): maximum number of tree nodes (including the root)
+#    """
+#    max_leafs = np.floor(n / (2 * min_leaf))
+#    max_levels = np.ceil(np.log2(max_leafs)).astype('int')
+#    return 2 ** (max_levels + 1) - 1
+
+
+def _compute_child_node_ids(parent_id):
+    """
+    TODO: Write docstring.
+
+    :param parent_id:
+    :return:
+    """
+    left = 2 * parent_id + 1
+    right = left + 1
+
+    return left, right
+
+
 def _compute_potential_splitting_points(t, min_leaf):
     """
     Computes potential splitting point indices.
@@ -185,13 +215,16 @@ def _find_optimal_split(
 
     # store split information
     split_information = np.array(
-        [split_var, split_value, split_index, loss, level, np.nan]
+        [split_var, split_value, split_index, loss, level, np.nan, 0]
     )
 
     return left, right, split_information
 
 
-def _fit(y, t, x, index, metric, loss_weighting, min_leaf, level=0):
+def _fit(
+        y, t, x, index,
+        metric, loss_weighting, min_leaf,
+        level=0, nodeid=0):
     """
     Core function which recursively splits the feature space until stopping
     criterium is reached (`min_leaf`) and returns splitting information.
@@ -205,27 +238,37 @@ def _fit(y, t, x, index, metric, loss_weighting, min_leaf, level=0):
     :param metric: a distance function, e.g. l2 loss
     :param min_leaf: minimum number of either treated or untreated observations
                     to be in a leaf after the split
+    :param level:
+    :param nodeid:
     :return:
     """
-    out = np.array([]).reshape((-1, 6))
+    out = np.array([]).reshape((-1, 7))
     tmp = _find_optimal_split(
         y, t, x, index, metric, loss_weighting, min_leaf, level
     )
+
     if tmp is None:
         # if we do not split, the node must be a leaf, hence we add the
         # treatment effect
         te = _estimate_treatment_effect(y[index], t[index])
-        out = np.array(5 * [np.nan] + [te]).reshape((-1, 6))
+        out = np.array(4 * [np.nan] + [level, te, nodeid]).reshape((-1, 7))
         return out
     else:
         left, right, split_information = tmp
-        out = np.concatenate((out, split_information.reshape((1, -1))), axis=0)
+        split_information[6] = nodeid
+        out = np.concatenate((out, split_information.reshape((-1, 7))), axis=0)
+
+        leftid, rightid = _compute_child_node_ids(nodeid)
 
         out_left = _fit(
-            y, t, x, left, metric, loss_weighting, min_leaf, level + 1
+            y, t, x, left,
+            metric, loss_weighting,
+            min_leaf, level + 1, leftid
         )
         out_right = _fit(
-            y, t, x, right, metric, loss_weighting, min_leaf, level + 1
+            y, t, x, right,
+            metric, loss_weighting,
+            min_leaf, level + 1, rightid
         )
 
         if out_left.size != 0:
@@ -236,7 +279,7 @@ def _fit(y, t, x, index, metric, loss_weighting, min_leaf, level=0):
         return out
 
 
-def fitcausaltree(y, t, x, min_leaf, metric=None, loss_weighting=None):
+def fitcausaltree(y, t, x, min_leaf=3, metric=None, loss_weighting=None):
     """
     Wrapper function for core function _fit.
 
