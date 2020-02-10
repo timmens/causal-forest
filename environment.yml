@@ -1,0 +1,37 @@
+name: causal-forest
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+
+  - python=3.7
+  - pip=19.0.3
+  - anaconda-client
+  - conda-build
+  - conda-verify
+  - fuzzywuzzy
+  - joblib
+  - jupyterlab
+  - nbsphinx
+  - numba >= 0.12
+  - numpy=1.16
+  - pandas=0.24
+  - petsc4py>=3.11
+  - scipy=1.2.1
+  - seaborn
+  - sphinx
+  - sphinx_rtd_theme
+  - sphinxcontrib-bibtex
+  - pip:
+    - black
+    - blackcellmagic
+    - bump2version
+    - pdbpp
+    - pre-commit
+    - pytest
+    - pytest-mock
+    - pytest-xdist
+    - restructuredtext_lint
+    - tox-conda
