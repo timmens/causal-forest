@@ -315,17 +315,17 @@ def _fit_node(y, t, x, index, crit_params, func_params, id_params):
     level = id_params["level"]
     nodeid = id_params["id"]
 
-    column_names = [
-        "id",
-        "left_child",
-        "right_child",
-        "level",
-        "split_feat",
-        "split_value",
-        "treat_effect",
-    ]
+    # column_names = [
+    #     "id",
+    #     "left_child",
+    #     "right_child",
+    #     "level",
+    #     "split_feat",
+    #     "split_value",
+    #     "treat_effect",
+    # ]
 
-    df_out = pd.DataFrame(columns=column_names)
+    # df_out = pd.DataFrame(columns=column_names)
 
     tmp = _find_optimal_split(y, t, x, index, crit_params["min_leaf"],)
 
@@ -336,10 +336,11 @@ def _fit_node(y, t, x, index, crit_params, func_params, id_params):
 
         info = np.array(
             [nodeid, np.nan, np.nan, level, np.nan, np.nan, treat_effect,]
-        )
+        ).reshape((1, 7))
 
-        to_append = pd.Series(info, column_names)
-        return df_out.append(to_append, ignore_index=True)
+        # to_append = pd.Series(info, column_names)
+        # return df_out.append(to_append, ignore_index=True)
+        return info
     else:
         left, right, split_feat, split_value = tmp
 
@@ -349,9 +350,9 @@ def _fit_node(y, t, x, index, crit_params, func_params, id_params):
         info = np.array([nodeid, leftid, rightid, level])
 
         split_info = np.array([split_feat, split_value, np.nan])
-        info = np.append(info, split_info)
-        to_append = pd.Series(info, column_names)
-        df_out = df_out.append(to_append, ignore_index=True)
+        info = np.append(info, split_info).reshape((1, 7))
+        # to_append = pd.Series(info, column_names)
+        # df_out = df_out.append(to_append, ignore_index=True)
 
         id_params_left = id_params.copy()
         id_params_left["id"] = leftid
@@ -380,10 +381,13 @@ def _fit_node(y, t, x, index, crit_params, func_params, id_params):
             id_params=id_params_right,
         )
 
-        df_out = df_out.append(out_left, ignore_index=True)
-        df_out = df_out.append(out_right, ignore_index=True)
+        # df_out = df_out.append(out_left, ignore_index=True)
+        # df_out = df_out.append(out_right, ignore_index=True)
+        out = np.vstack((info, out_left))
+        out = np.vstack((out, out_right))
 
-        return df_out
+        # return df_out
+        return out
 
 
 def fit_causaltree(y, t, x, crit_params=None, func_params=None):
@@ -431,7 +435,7 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
     index = np.full((n,), True)
 
     # fit tree
-    df_ctree = _fit_node(
+    ctree_array = _fit_node(
         y=y,
         t=t,
         x=x,
@@ -441,6 +445,17 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
         id_params=id_params,
     )
 
+    column_names = [
+        "id",
+        "left_child",
+        "right_child",
+        "level",
+        "split_feat",
+        "split_value",
+        "treat_effect",
+    ]
+
+    df_ctree = pd.DataFrame(ctree_array, columns=column_names)
     df_ctree[
         ["id", "left_child", "right_child", "level", "split_feat"]
     ] = df_ctree[
