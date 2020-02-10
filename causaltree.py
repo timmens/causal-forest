@@ -3,6 +3,7 @@
 from itertools import count
 
 import numpy as np
+import pandas as pd
 
 
 def _compute_child_node_ids(parent_id):
@@ -132,23 +133,20 @@ def _retrieve_index(index, index_sorted, split_index):
     return left_index, right_index, global_split_index
 
 
-def _find_optimal_split(
-    y, t, x, index, metric, loss_weighting, min_leaf, level
-):
+def _find_optimal_split(y, t, x, index, metric, loss_weighting, min_leaf):
     """
-    Given the data (`y`, `t`, `x`) finds optimal splitting point in the
-    feature space given the observations selected in `index` and a metric
-    `metric`. Note that the algorithm is the standard implementation of the
-    recursive binary splitting algorithm for decision trees.
 
-    :param y: (n,) np.array containing dependent variable
-    :param t: (n,) np.array (bool) containing treatment status
-    :param x: (n,p) np.array containing independent variables
-    :param index: (n,) np.array (bool) representing observations to consider
-    :param metric: a distance function, e.g. l2 loss
-    :param min_leaf: minimum number of either treated or untreated observations
-                    to be in a leaf after the split
-    :return:
+    Args:
+        y:
+        t:
+        x:
+        index:
+        metric:
+        loss_weighting:
+        min_leaf:
+
+    Returns:
+
     """
     _, p = x.shape
     split_var = None
@@ -195,184 +193,183 @@ def _find_optimal_split(
         index, index_sorted, split_index
     )
 
-    # store split information
-    split_information = np.array(
-        [split_var, split_value, split_index, loss, level, np.nan, 0]
-    )
-
-    return left, right, split_information
+    return left, right, split_var, split_value
 
 
-def _fit_node(
-    y,
-    t,
-    x,
-    index,
-    metric,
-    loss_weighting,
-    min_leaf,
-    max_depth,
-    counter,
-    level=0,
-    nodeid=0,
-):
+def _fit_node(y, t, x, index, crit_params, func_params, id_params):
     """
-    Core function which recursively splits the feature space until stopping
-    criterium is reached (`min_leaf`) and returns splitting information.
-    Fits a Causal Tree on the data (`y`, `t`, `x`), where `y` and `t` are
-    1d np.arrays of length n and `x` is a 2d np.array of dimension n x p.
+    Recursively split feature space until stopping criteria in *crit_params*
+    are reached.
 
-    :param y: (n,) np.array containing dependent variable
-    :param t: (n,) np.array containing treatment status
-    :param x: (n,p) np.array containing independent variables
-    :param index: (n,) np.array (bool) containing indices of observations
-    :param metric: a distance function, e.g. l2 loss
-    :param min_leaf: minimum number of either treated or untreated observations
-                    to be in a leaf after the split
-    :param level:
-    :param nodeid:
-    :return:
+    Args:
+        y:
+        t:
+        x:
+        index:
+        crit_params:
+        func_params:
+        id_params:
+
+    Returns:
+
     """
-    out = np.array([]).reshape((-1, 7))
+    level = id_params["level"]
+    nodeid = id_params["id"]
+
+    column_names = [
+        "id",
+        "left_child",
+        "right_child",
+        "level",
+        "split_feat",
+        "split_value",
+        "treat_effect",
+    ]
+
+    df_out = pd.DataFrame(columns=column_names)
+
     tmp = _find_optimal_split(
-        y, t, x, index, metric, loss_weighting, min_leaf, level
-    )
-
-    if tmp is None or level == max_depth:
-        # if we do not split the node must be a leaf, hence we add the
-        # treatment effect
-        te = _estimate_treatment_effect(y[index], t[index])
-        out = np.array(4 * [np.nan] + [level, te, nodeid]).reshape((-1, 7))
-        return out
-    else:
-        left, right, split_information = tmp
-        split_information[6] = nodeid
-        out = np.concatenate((out, split_information.reshape((-1, 7))), axis=0)
-
-        leftid = next(counter)
-        rightid = next(counter)
-
-        out_left = _fit_node(
-            y,
-            t,
-            x,
-            left,
-            metric,
-            loss_weighting,
-            min_leaf,
-            max_depth,
-            counter,
-            level + 1,
-            leftid,
-        )
-        out_right = _fit_node(
-            y,
-            t,
-            x,
-            right,
-            metric,
-            loss_weighting,
-            min_leaf,
-            max_depth,
-            counter,
-            level + 1,
-            rightid,
-        )
-
-        if out_left.size != 0:
-            out = np.concatenate((out, out_left), axis=0)
-        if out_right.size != 0:
-            out = np.concatenate((out, out_right), axis=0)
-
-        return out
-
-
-def fit_causaltree(
-    y, t, x, min_leaf=3, max_depth=25, metric=None, loss_weighting=None
-):
-    """
-    Wrapper function for core function _fit.
-
-    :param y: (n,) np.array containing dependent variable
-    :param t: (n,) np.array containing treatment status
-    :param x: (n,p) np.array containing independent variables
-    :param min_leaf: minimum number of either treated or untreated observations
-                    to be in a leaf after the split
-    :param max_depth: maxmimum number of allowed levels
-    :param metric: a distance function, e.g. l2 loss
-    :param loss_weighting: a function which computes the global loss of a split
-                        by combining the losses in each subset using weights
-                        given by the no. of obersavtions falling in the
-                        respective subset.
-    :return:
-    """
-    n = len(y)
-    index = np.full((n,), True)
-
-    if metric is None:
-
-        def metric(outcomes, estimate):
-            return np.sum((outcomes - estimate) ** 2)
-
-    if loss_weighting is None:
-
-        def loss_weighting(left_loss, right_loss, w1, w2):
-            return left_loss + right_loss
-
-    # initialize counter object
-    counter = count()
-    rootid = next(counter)
-
-    # fit tree
-    tree = _fit_node(
         y,
         t,
         x,
         index,
-        metric,
-        loss_weighting,
-        counter,
-        min_leaf,
-        max_depth,
-        0,
-        rootid,
+        func_params["metric"],
+        func_params["weight_loss"],
+        crit_params["min_leaf"],
     )
 
-    return tree
+    if tmp is None or level == crit_params["max_depth"]:
+        # if we do not split the node must be a leaf, hence we add the
+        # treatment effect
+        treat_effect = _estimate_treatment_effect(y[index], t[index])
+
+        info = np.array(
+            [nodeid, np.nan, np.nan, level, np.nan, np.nan, treat_effect,]
+        )
+
+        to_append = pd.Series(info, column_names)
+        return df_out.append(to_append, ignore_index=True)
+    else:
+        left, right, split_feat, split_value = tmp
+
+        leftid = next(id_params["counter"])
+        rightid = next(id_params["counter"])
+
+        info = np.array([nodeid, leftid, rightid, level])
+
+        split_info = np.array([split_feat, split_value, np.nan])
+        info = np.append(info, split_info)
+        to_append = pd.Series(info, column_names)
+        df_out = df_out.append(to_append, ignore_index=True)
+
+        id_params_left = id_params.copy()
+        id_params_left["id"] = leftid
+        id_params_left["level"] += 1
+
+        id_params_right = id_params.copy()
+        id_params_right["id"] = rightid
+        id_params_right["level"] += 1
+
+        out_left = _fit_node(
+            y=y,
+            t=t,
+            x=x,
+            index=left,
+            crit_params=crit_params,
+            func_params=func_params,
+            id_params=id_params_left,
+        )
+        out_right = _fit_node(
+            y=y,
+            t=t,
+            x=x,
+            index=right,
+            crit_params=crit_params,
+            func_params=func_params,
+            id_params=id_params_right,
+        )
+
+        df_out = df_out.append(out_left, ignore_index=True)
+        df_out = df_out.append(out_right, ignore_index=True)
+
+        return df_out
 
 
-def _does_node_have_children(ctree, node_id):
+def fit_causaltree(y, t, x, crit_params=None, func_params=None):
+    """ Wrapper function for `_fit_node`. Sets default parameters for
+    *crit_params* and *func_params* and calls internal fitting function
+    `_fit_node`. Returns fitted tree as a pd.DataFrame.
+
+    Args:
+        y:
+        t:
+        x:
+        crit_params:
+        func_params:
+
+    Returns:
+
     """
-    Returns `True` if node `node_id` has children in tree `ctree` and False
-    else.
 
-    :param ctree:
-    :param node_id:
-    :return:
-    """
-    left, _ = _compute_child_node_ids(node_id)
-    return np.isin(ctree[:, 6], left)
+    if crit_params is None:
+        crit_params = {
+            "min_leaf": 3,
+            "max_depth": 25,
+        }
+
+    if func_params is None:
+
+        def metric(outcomes, estimate):
+            return np.sum((outcomes - estimate) ** 2)
+
+        def weight_loss(left_loss, right_loss, w1, w2):
+            return left_loss + right_loss
+
+        func_params = {
+            "metric": metric,
+            "weight_loss": weight_loss,
+        }
+
+    # initialize counter object and id_params
+    counter = count()
+    rootid = next(counter)
+    id_params = {"counter": counter, "id": rootid, "level": 0}
+
+    # initialize index
+    n = len(y)
+    index = np.full((n,), True)
+
+    # fit tree
+    df_ctree = _fit_node(
+        y=y,
+        t=t,
+        x=x,
+        index=index,
+        crit_params=crit_params,
+        func_params=func_params,
+        id_params=id_params,
+    )
+
+    df_ctree[
+        ["id", "left_child", "right_child", "level", "split_feat"]
+    ] = df_ctree[
+        ["id", "left_child", "right_child", "level", "split_feat"]
+    ].astype(
+        "Int64"
+    )
+
+    df_out = df_ctree.set_index("id").sort_index()
+    return df_out
 
 
 def predict_causaltree(ctree, x):
     """
-    Predicts new outcomes using a fitted causal tree `ctree` from new features
-    `x`.
 
-    :param ctree: a fitted causal tree
-    :param x: new covariates from which we want to predict outcomes
-    :return: predicted outcomes
+    Args:
+        ctree:
+        x:
+
+    Returns:
+
     """
-    node = 0
-
-    has_children = _does_node_have_children(ctree, node)
-    while has_children:
-        var, value = ctree[node, 0], ctree[node, 1]
-        if x[var] <= value:
-            node, _ = _compute_child_node_ids(node)
-        else:
-            _, node = _compute_child_node_ids(node)
-        has_children = _does_node_have_children(ctree, node)
-
-    out = ctree[node, 5]
-    return out
+    pass
