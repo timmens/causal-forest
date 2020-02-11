@@ -9,44 +9,59 @@ from numba import njit
 
 def _compute_valid_splitting_indices(t, min_leaf):
     """
-    Computes potential splitting point indices.
+    Given an array *t* of treatment status and an integer *min_leaf* --denoting
+    the minimum number of allowed observations of each type in a leaf node--
+    computes a sequence of indices on which we can split *t* and get that each
+    resulting side contains a minimum of *min_leaf* treated and untreated
+    observations. Returns an empty sequence if no split is possible.
 
-    :param t: (n, ) np.array (bool) treatment status sorted wrt to features
-    :param min_leaf:
-    :return: sequence of indices to be considered for a split
+    Args:
+        t (np.array): 1d array containing the the treatment status as treated =
+            True and untreated = False.
+        min_leaf (int): Minimum number of observations of each type (treated,
+            untreated) allowed in a leaf; has to be greater than 1.
+
+    Returns:
+        out (np.array): a sequence of indices representing valid splitting
+            points.
+
     """
-    nn = len(t)
-    if nn <= min_leaf:
-        return np.arange(0)
+    out = np.arange(0)
 
-    tmp = np.where(np.cumsum(t) == min_leaf)[0]
-    if tmp.size == 0:
-        return np.arange(0)
-    else:
-        left_treated = tmp[0]
-    tmp = np.where(np.cumsum(~t) == min_leaf)[0]
-    if tmp.size == 0:
-        return np.arange(0)
-    else:
-        left_untreated = tmp[0]
-    left = max(left_treated, left_untreated)
+    n = len(t)
+    if n < 2 * min_leaf:
+        return out
 
-    tmp = np.where(np.cumsum(np.flip(t)) == min_leaf)[0]
-    if tmp.size == 0:
-        return np.arange(0)
-    else:
-        right_treated = tmp[0]
-    tmp = np.where(np.cumsum(np.flip(~t)) == min_leaf)[0]
-    if tmp.size == 0:
-        return np.arange(0)
-    else:
-        right_untreated = tmp[0]
-    right = nn - 1 - max(right_treated, right_untreated)
+    # find first index at which *min_leaf* treated obs. are in left split
+    left_index_treated = np.argmax(np.cumsum(t) == min_leaf)
+    if left_index_treated == 0:
+        return out
+
+    # find first index at which *min_leaf* untreated obs. are in left split
+    left_index_untreated = np.argmax(np.cumsum(~t) == min_leaf)
+    if left_index_untreated == 0:
+        return out
+
+    # first split at which both treated and untreated occure more often than
+    # *min_leaf* is given by the maximum.
+    left = np.max([left_index_treated, left_index_untreated])
+
+    # do the same for right side
+    right_index_treated = np.argmax(np.cumsum(np.flip(t)) == min_leaf)
+    if right_index_treated == 0:
+        return out
+
+    right_index_untreated = np.argmax(np.cumsum(np.flip(~t)) == min_leaf)
+    if right_index_untreated == 0:
+        return out
+
+    right = n - np.max([right_index_treated, right_index_untreated])
 
     if left > right - 1:
-        return np.arange(0)
+        return out
     else:
-        return np.arange(left, right - 1)
+        out = np.arange(left, right - 1)
+        return out
 
 
 @njit
