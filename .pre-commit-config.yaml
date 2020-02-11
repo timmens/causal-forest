@@ -10,10 +10,6 @@ repos:
     hooks:
     -   id: reorder-python-imports
         types: [python]
-# -   repo: https://github.com/pre-commit/pre-commit-hooks
-#     rev: v2.1.0
-#     hooks:
-#     -   id: check-yaml
 -   repo: https://github.com/asottile/blacken-docs
     rev: v1.4.0
     hooks:
@@ -43,13 +39,10 @@ repos:
         -   id: doc8
 -   repo: local
     hooks:
-    -   id: restructuredtext-lint
-        entry: rst-lint
+    -   id: pytest
+        name: pytest
+        entry: pytest -v
         language: system
-        files: '(README.rst)'
-        name: restructuredtext-lint - Is the README PyPi-compliant?
-#-   repo: meta
-#    hooks:
-#    -   id: check-hooks-apply
-#    -   id: check-useless-excludes
-#    # -   id: identity  # Prints all files passed to pre-commits. Debugging.
+        types: [python]
+        stages: [commit]
+        pass_filenames: false
