@@ -16,7 +16,7 @@ def _compute_valid_splitting_indices(t, min_leaf):
     observations. Returns an empty sequence if no split is possible.
 
     Args:
-        t (np.array): 1d array containing the the treatment status as treated =
+        t (np.array): 1d array containing the treatment status as treated =
             True and untreated = False.
         min_leaf (int): Minimum number of observations of each type (treated,
             untreated) allowed in a leaf; has to be greater than 1.
@@ -82,14 +82,20 @@ def _transform_outcome(y, t):
 @njit
 def _estimate_treatment_effect(y, t):
     """
-    Estimates average treatment effect (ATE) using outcomes `y` and treatment
-    status `t`.
+    Estimates average treatment effect (ATE) using outcomes *y* and treatment
+    status *t*.
 
-    :param y: (n,) np.array containing outcomes
-    :param t: (n,) np.array (bool) containing treatment status
-    :return: float scalar representing estimated treatment effect
+    Args:
+        y (np.array): 1d array containing outcomes
+        t (np.array): 1d array containing the treatment status as treated =
+            True and untreated = False.
+
+    Returns:
+        out (float): the estimated treatment effect
+
     """
-    return y[t].mean() - y[~t].mean()
+    out = y[t].mean() - y[~t].mean()
+    return out
 
 
 @njit
@@ -113,47 +119,66 @@ def _weight_loss(left_loss, right_loss, n_left, n_right):
 
 
 @njit
-def _retrieve_index(index, index_sorted, split_index):
+def _retrieve_index(index, sorted_subset_index, split_index):
     """
-    Given `index` (bool index of length of the original training data (n)),
-    `index_sorted` (index of length of sum of True values in `index`) and
-    `split_index` (index of `index_sorted` where the split should occur),
-    computes new index left and new index right corresponding to the split.
+    Given an array of indices *index* of length of the original data set, and
+    a sorted index array *index_sorted* (sorted with respect to the feature
+    on which we split; see function _find_optimal_split) and an index on which
+    we want to split (*split_index*), `_retrieve_index` computes two indices
+    (left and right) the same length as *index* corresponding to observations
+    falling falling left and right to the splitting point, respectively.
 
-    :param index: (n,) np.array (bool)
-    :param index_sorted:
-    :param split_index:
-    :return: three dim tuple
+    Args:
+        index (np.array): boolean
+        sorted_subset_index (np.array): int
+        split_index (int):
+
+    Returns:
+        out: 2d tuple containing np.arrays left_index and right_index the same
+            length as *index*
+
     """
-    left = index_sorted[: (split_index + 1)]
-    right = index_sorted[(split_index + 1) :]
+    left = sorted_subset_index[: (split_index + 1)]
+    right = sorted_subset_index[(split_index + 1) :]
     nonzero_index = np.nonzero(index)[0]
 
+    # initialize new indices
     n = len(index)
-
     left_index = np.full((n,), False)
     right_index = np.full((n,), False)
+
+    # fill nonzero values
     left_index[nonzero_index[left]] = True
     right_index[nonzero_index[right]] = True
+
     # global_split_index = nonzero_index[index_sorted[split_index]]
 
-    return left_index, right_index
+    out = left_index, right_index
+    return out
 
 
 @njit
-def _compute_treatment_effect_raw(sum_1, n_1, sum_0, n_0):
+def _compute_treatment_effect_raw(
+    sum_treated, n_treated, sum_untreated, n_untreated
+):
     """
+    Computes average treatment effect (ATE) using the sum of outcomes of
+    treated and untreated observations (*sum_treated* and *sum_untreated*) and
+    the number of treated and untreated observations (*n_treated* and
+    *n_untreated*).
 
     Args:
-        sum_1:
-        n_1:
-        sum_0:
-        n_0:
+        sum_treated:
+        n_treated:
+        sum_untreated:
+        n_untreated:
 
     Returns:
+        out (float): the estimated treatment effect
 
     """
-    return sum_1 / n_1 - sum_0 / n_0
+    out = sum_treated / n_treated - sum_untreated / n_untreated
+    return out
 
 
 @njit
@@ -190,6 +215,19 @@ def _compute_loss_raw_right(yy_transformed, i, te):
 def _find_optimal_split_observation_loop(
     splitting_indices, yy, yy_transformed, xx, tt, loss
 ):
+    """
+
+    Args:
+        splitting_indices:
+        yy:
+        yy_transformed:
+        xx:
+        tt:
+        loss:
+
+    Returns:
+
+    """
     if len(splitting_indices) == 0:
         return loss, None, None
 
@@ -260,8 +298,6 @@ def _find_optimal_split(y, t, x, index, min_leaf):
         t:
         x:
         index:
-        metric:
-        loss_weighting:
         min_leaf:
 
     Returns:
@@ -285,13 +321,11 @@ def _find_optimal_split(y, t, x, index, min_leaf):
 
         splitting_indices = _compute_valid_splitting_indices(tt, min_leaf)
 
-        (
-            jloss,
-            jsplit_value,
-            jsplit_index,
-        ) = _find_optimal_split_observation_loop(
+        # loop through observations
+        tmp = _find_optimal_split_observation_loop(
             splitting_indices, yy, yy_transformed, xx, tt, loss
         )
+        jloss, jsplit_value, jsplit_index = tmp
 
         if jloss < loss:
             split_feat = j
