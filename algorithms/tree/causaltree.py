@@ -1,5 +1,8 @@
-# Module to fit a causal tree on numpy arrays using numba
-# TODO: see issues on github
+#!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
+"""
+Module to fit a causal tree.
+"""
 from itertools import count
 
 import numpy as np
@@ -20,7 +23,7 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
         func_params:
 
     Returns:
-
+        ctree (pd.DataFrame):
     """
 
     if crit_params is None:
@@ -72,17 +75,13 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
         "treat_effect",
     ]
 
-    df_ctree = pd.DataFrame(ctree_array, columns=column_names)
-    df_ctree[
+    ctree = pd.DataFrame(ctree_array, columns=column_names)
+    ctree[["id", "left_child", "right_child", "level", "split_feat"]] = ctree[
         ["id", "left_child", "right_child", "level", "split_feat"]
-    ] = df_ctree[
-        ["id", "left_child", "right_child", "level", "split_feat"]
-    ].astype(
-        "Int64"
-    )
+    ].astype("Int64")
 
-    df_out = df_ctree.set_index("id").sort_index()
-    return df_out
+    ctree = ctree.set_index("id").sort_index()
+    return ctree
 
 
 def _fit_node(y, t, x, index, crit_params, func_params, id_params):

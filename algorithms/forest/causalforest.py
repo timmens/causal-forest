@@ -11,7 +11,7 @@ from itertools import count
 import numpy as np
 import pandas as pd
 
-from algorithms.causaltree import fit_causaltree
+from algorithms.tree.causaltree import fit_causaltree
 
 
 def fit_causalforest(
