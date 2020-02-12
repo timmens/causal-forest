@@ -1,13 +1,14 @@
-from itertools import count
-
 import numpy as np
+import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
 
 from algorithms.causaltree import _compute_valid_splitting_indices
 from algorithms.causaltree import _find_optimal_split_observation_loop
+from algorithms.causaltree import _predict_row_causaltree
 from algorithms.causaltree import _retrieve_index
 from algorithms.causaltree import _transform_outcome
+from algorithms.causaltree import predict_causaltree
 
 
 tt = [
@@ -83,18 +84,17 @@ def setup_retrieve_index_for_completeness():
     sorted_subset_index = np.argsort(x)
     split_index = int(len(index) / 2)
 
-    out = {}
-    out["index"] = index
-    out["sorted_subset_index"] = sorted_subset_index
-    out["split_index"] = split_index
-
+    out = {
+        "index": index,
+        "sorted_subset_index": sorted_subset_index,
+        "split_index": split_index,
+    }
     return out
 
 
 def test__retrieve_index_for_completeness(
     setup_retrieve_index_for_completeness,
 ):
-
     left, right = _retrieve_index(**setup_retrieve_index_for_completeness)
     combined = np.array(left, dtype=int) + np.array(right, dtype=int)
 
@@ -135,3 +135,31 @@ def test__find_optimal_split_observation_loop():
     assert abs(split_value) < 0.02
     # as above (check if we find an index close to the middle)
     assert abs(split_index - numsim / 2) < 15
+
+
+ctree = pd.read_csv("tests/data/fitted_ctree__predict_row_test.csv")
+ctree[["left_child", "right_child", "level", "split_feat"]] = ctree[
+    ["left_child", "right_child", "level", "split_feat"]
+].astype("Int64")
+ctrees = [ctree] * 4
+rows = [
+    np.array([1, 1]),
+    np.array([1, -1]),
+    np.array([-1, 1]),
+    np.array([-1, -1]),
+]
+expected = [0.0, -5.0, 2.0, 14.0]
+
+
+@pytest.mark.parametrize("ctree, row, exp", zip(ctrees, rows, expected))
+def test__predict_row_causaltree(ctree, row, exp):
+    prediction = _predict_row_causaltree(ctree, row)
+    assert prediction == exp
+
+
+def test__predict_causaltree():
+    x = np.array(rows)
+    exp = np.array(expected)
+
+    prediction = predict_causaltree(ctree, x)
+    assert_array_equal(prediction, exp)
