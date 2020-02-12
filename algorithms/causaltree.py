@@ -64,7 +64,6 @@ def _compute_valid_splitting_indices(t, min_leaf):
         return out
 
 
-@njit
 def _transform_outcome(y, t):
     """
     Transforms outcome using naive propensity scores (Prob[`t`=1] = 1/2).
@@ -79,7 +78,6 @@ def _transform_outcome(y, t):
     return y_transformed
 
 
-@njit
 def _estimate_treatment_effect(y, t):
     """
     Estimates average treatment effect (ATE) using outcomes *y* and treatment
@@ -118,7 +116,6 @@ def _weight_loss(left_loss, right_loss, n_left, n_right):
     return left + right
 
 
-@njit
 def _retrieve_index(index, sorted_subset_index, split_index):
     """
     Given an array of indices *index* of length of the original data set, and
@@ -181,7 +178,6 @@ def _compute_treatment_effect_raw(
     return out
 
 
-@njit
 def _compute_loss_raw_left(yy_transformed, i, te):
     """
 
@@ -196,7 +192,6 @@ def _compute_loss_raw_left(yy_transformed, i, te):
     return te ** 2 - 2 * te * yy_transformed[: (i + 1)].sum()
 
 
-@njit
 def _compute_loss_raw_right(yy_transformed, i, te):
     """
 
@@ -211,7 +206,6 @@ def _compute_loss_raw_right(yy_transformed, i, te):
     return te ** 2 - 2 * te * yy_transformed[(i + 1) :].sum()
 
 
-@njit
 def _find_optimal_split_observation_loop(
     splitting_indices, yy, yy_transformed, xx, tt, loss
 ):

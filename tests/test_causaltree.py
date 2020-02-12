@@ -9,8 +9,6 @@ from algorithms.causaltree import _find_optimal_split_observation_loop
 from algorithms.causaltree import _retrieve_index
 from algorithms.causaltree import _transform_outcome
 
-# random number seed counter
-counter = count(0)
 
 tt = [
     np.array([False]),
@@ -55,19 +53,55 @@ def test__compute_valid_splitting_indices_with_output(t, min_leaf, out_exp):
     assert_array_equal(out, out_exp)
 
 
-def test__retrieve_index_for_completeness():
-    seed = next(counter)
-    np.random.seed(seed)
-
-    index = tt[0]
-    x = np.random.randn(len(index))
+@pytest.fixture
+def setup_retrieve_index_for_completeness():
+    index = np.concatenate(
+        (
+            np.full((10,), False),
+            np.array([True, True, False, True, True, False, False]),
+            np.full((10,), True),
+        )
+    )
+    x = np.array(
+        [
+            0.32956842,
+            -0.55119603,
+            -1.11740483,
+            -0.26300451,
+            -0.06686618,
+            0.21236623,
+            0.06182492,
+            0.66415156,
+            -0.19704692,
+            0.41878558,
+            0.58971691,
+            -1.3248038,
+            -0.55965504,
+            -0.28713562,
+        ]
+    )
     sorted_subset_index = np.argsort(x)
     split_index = int(len(index) / 2)
 
-    left, right = _retrieve_index(index, sorted_subset_index, split_index)
+    out = {}
+    out["index"] = index
+    out["sorted_subset_index"] = sorted_subset_index
+    out["split_index"] = split_index
+
+    return out
+
+
+def test__retrieve_index_for_completeness(
+    setup_retrieve_index_for_completeness,
+):
+
+    left, right = _retrieve_index(**setup_retrieve_index_for_completeness)
     combined = np.array(left, dtype=int) + np.array(right, dtype=int)
 
-    assert assert_array_equal(index, np.array(combined, dtype=bool))
+    assert_array_equal(
+        setup_retrieve_index_for_completeness["index"],
+        np.array(combined, dtype=bool),
+    )
 
 
 def test__retrieve_index_reverse_engineer_split_point():
@@ -82,8 +116,7 @@ def test__find_optimal_split_observation_loop():
     # Simulate data for which we know that the split must occur at x = 0
     numsim = 10000
     x = np.linspace(-1, 1, num=numsim + 1)
-    seed = next(counter)
-    np.random.seed(seed)
+    np.random.seed(2)
     t = np.array(np.random.binomial(1, 0.5, numsim + 1), dtype=bool)
     y = np.repeat([-1, 1], int(numsim / 2))
     y = np.insert(y, int(numsim / 2), -1)
