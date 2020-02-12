@@ -546,5 +546,14 @@ def _predict_row_causaltree(ctree, row):
         prediction (float): treatment prediction.
 
     """
-    # traverse tree and until reach leaf then return treatment effect.
-    pass
+    current_id = 0
+    while np.isnan(ctree.loc[current_id, "treat_effect"]):
+        split_feat = ctree.loc[current_id, "split_feat"]
+        go_left = row[split_feat] <= ctree.loc[current_id, "split_value"]
+
+        if go_left:
+            current_id = ctree.loc[current_id, "left_child"]
+        else:
+            current_id = ctree.loc[current_id, "right_child"]
+
+    return ctree.loc[current_id, "treat_effect"]
