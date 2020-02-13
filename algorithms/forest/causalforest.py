@@ -61,16 +61,19 @@ def _draw_resample_index(n, seed):
     """Compute vector of randomly drawn indices with replacement.
 
     Draw indices with replacement from the discrete uniform distribution
-    on {1,...,n}.
+    on {0,...,n-1}. We control the randomness by setting the seed to *seed*.
+    If *seed* = -1 we return all indices {0,1,2,...,n-1} for debugging.
 
     Args:
         n (int): Upper bound for indices and number of indices to draw
         seed (int): Random number seed.
 
     Returns:
-        indices (np.array):
+        indices (np.array): Resample indices (resampled with replacement)
 
     """
+    if seed == -1:
+        return np.arange(n)
     np.random.seed(seed)
     indices = np.random.randint(0, n, n)
     return indices
