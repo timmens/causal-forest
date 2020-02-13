@@ -511,7 +511,8 @@ def _compute_loss_raw_right(yy_transformed, i, te):
 
 
 def predict_causaltree(ctree, x):
-    """
+    """Predicts individual treatment effects for a causal tree.
+
     Predicts individual treatment effects for new observed features *x*
     on a fitted causal tree *ctree*.
 
@@ -533,7 +534,8 @@ def predict_causaltree(ctree, x):
 
 
 def _predict_row_causaltree(ctree, row):
-    """
+    """Predicts treatment effect for a single individual.
+
     Predicts individual treatment effects for new observed features *row* for a
     single individual on a fitted causal tree *ctree*.
 

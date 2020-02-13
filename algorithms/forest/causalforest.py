@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from algorithms.tree.causaltree import fit_causaltree
+from algorithms.tree.causaltree import predict_causaltree
 
 
 def fit_causalforest(
@@ -51,7 +52,7 @@ def fit_causalforest(
         cforest.append(ctree)
 
     cforest = pd.concat(
-        cforest, keys=range(1, num_trees + 1), names=["tree_id", "node_id"]
+        cforest, keys=range(num_trees), names=["tree_id", "node_id"]
     )
 
     return cforest
@@ -77,3 +78,30 @@ def _draw_resample_index(n, seed):
     np.random.seed(seed)
     indices = np.random.randint(0, n, n)
     return indices
+
+
+def predict_causalforest(cforest, x):
+    """Predicts individual treatment effects for a causal forest.
+
+    Predicts individual treatment effects for new observed features *x*
+    on a fitted causal forest *cforest*.
+
+    Args:
+        cforest (pd.DataFrame): fitted causal forest represented in a multi-
+            index pd.DataFrame consisting of several fitted causal trees
+        x (np.array): 2d array of new observations for which we predict the
+            individual treatment effect.
+
+    Returns:
+        predictions (np.array): 1d array of treatment predictions.
+
+    """
+    num_trees = len(cforest.groupby(level=0))
+    n, p = x.shape
+
+    predictions = np.empty((num_trees, n))
+    for i in range(num_trees):
+        predictions[i, :] = predict_causaltree(cforest.loc[i], x)
+
+    predictions = predictions.mean(axis=0)
+    return predictions
