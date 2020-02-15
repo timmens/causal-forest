@@ -13,8 +13,8 @@ install:
   - source activate causal-forest
 
 script:
-  - source .envrc
-    #- travis_wait python utils/travis_runner.py
+  # - source .envrc
+  #- travis_wait python utils/travis_runner.py
   - mkdir for_test
   - cd for_test
   - pytest -v
