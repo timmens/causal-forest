@@ -1,7 +1,7 @@
 language: python
 
 python:
-  - 3.7
+  - 3.6
 
 bundler_args: --retry 3
 
@@ -12,14 +12,9 @@ install:
   - conda env create -f environment.yml
   - source activate causal-forest
 
-
 script:
   - source .envrc
     #- travis_wait python utils/travis_runner.py
   - mkdir for_test
   - cd for_test
-  - pytest -v --cov=causal-forest --pyargs causal-forest
-
-
- after_success:
-   - codecov
+  - pytest -v
