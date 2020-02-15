@@ -11,8 +11,8 @@ dependencies:
   - anaconda-client
   - conda-build
   - conda-verify
-  - fuzzywuzzy
-  - joblib
+    #- fuzzywuzzy
+    #- joblib
   - jupyterlab
   - nbsphinx
   - numba >= 0.12
@@ -36,4 +36,4 @@ dependencies:
     - pytest-mock
     - pytest-xdist
     - restructuredtext_lint
-    - tox-conda
+      #- tox-conda
