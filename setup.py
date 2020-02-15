@@ -19,7 +19,11 @@ setup(
     author="Tim Mensinger",
     author_email="tim.mensinger@uni-bonn.de",
     packages=find_packages(exclude=["tests/*"]),
+    #    package_data={
+    #        "causal_forest": [
+    #            "causal_forest/tests/data/*.csv",
+    #        ],
+    #    },
+    #    include_package_data=True,
     zip_safe=False,
-    # package_data={"estimagic": ["optimization/algo_dict.json"]},
-    # include_package_data=True,
 )

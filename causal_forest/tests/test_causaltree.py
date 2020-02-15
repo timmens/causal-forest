@@ -137,7 +137,9 @@ def test__find_optimal_split_observation_loop():
     assert abs(split_index - numsim / 2) < 15
 
 
-ctree = pd.read_csv("tests/data/fitted_ctree__predict_row_test.csv")
+ctree = pd.read_csv(
+    "causal_forest/tests/data/fitted_ctree__predict_row_test.csv"
+)
 ctree[["left_child", "right_child", "level", "split_feat"]] = ctree[
     ["left_child", "right_child", "level", "split_feat"]
 ].astype("Int64")

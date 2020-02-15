@@ -1,0 +1,39 @@
+{% set data = load_setup_py_data() %}
+
+package:
+  name: causal_forest
+  version: {{ data.get('version') }}
+
+source:
+  path: ../causal-forest
+
+build:
+  number: 0
+
+
+requirements:
+  build:
+    - python {{ python }}
+    - setuptools
+
+  run:
+    - python {{ python }}
+    # - joblib
+    - numpy>=1.16.0
+    - pandas>=0.24
+    - numba
+
+#test:
+#  commands:
+#    - pytest
+#  files:
+#    - causal_forest/tests/
+#  requires:
+#    - pytest
+#    - conda-build
+
+about:
+  home: https://github.com/timmens/causal-forest
+  license: MIT
+  license_file: LICENSE
+  summary: Algorithm to estimate heterogeneous treatment effects. 
