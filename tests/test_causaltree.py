@@ -3,12 +3,12 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
 
-from algorithms.tree.causaltree import _compute_valid_splitting_indices
-from algorithms.tree.causaltree import _find_optimal_split_observation_loop
-from algorithms.tree.causaltree import _predict_row_causaltree
-from algorithms.tree.causaltree import _retrieve_index
-from algorithms.tree.causaltree import _transform_outcome
-from algorithms.tree.causaltree import predict_causaltree
+from causal_forest.tree.causaltree import _compute_valid_splitting_indices
+from causal_forest.tree.causaltree import _find_optimal_split_observation_loop
+from causal_forest.tree.causaltree import _predict_row_causaltree
+from causal_forest.tree.causaltree import _retrieve_index
+from causal_forest.tree.causaltree import _transform_outcome
+from causal_forest.tree.causaltree import predict_causaltree
 
 
 tt = [
