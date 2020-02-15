@@ -9,5 +9,5 @@ coverage:
 
 ignore:
   #- "release.py"
-  #- "setup.py"
+  - "setup.py"
   - "tests/*"
