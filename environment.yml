@@ -36,4 +36,5 @@ dependencies:
     - pytest-mock
     - pytest-xdist
     - restructuredtext_lint
+    - codecov
       #- tox-conda

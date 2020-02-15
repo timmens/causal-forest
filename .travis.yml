@@ -16,3 +16,6 @@ script:
   # - source .envrc
   #- travis_wait python utils/travis_runner.py
   - pytest -v
+
+after_success:
+  - codecov
