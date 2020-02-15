@@ -32,7 +32,7 @@ repos:
             flake8-eradicate, flake8-print, flake8-rst-docstrings, flake8-todo,
             pep8-naming, pydocstyle==3.0.0,
         ]
-        args: [--ignore=E203, --exclude=__init__.py causaltree.py simulate_data.py tests/*]
+        args: [--ignore=E203, --exclude=__init__.py setup.py causaltree.py simulate_data.py tests/*]
 -   repo: https://github.com/PyCQA/doc8
     rev: 0.8.1rc2
     hooks:
