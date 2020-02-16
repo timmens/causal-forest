@@ -74,11 +74,16 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
         "split_value",
         "treat_effect",
     ]
+    columns_to_int = [
+        "id",
+        "left_child",
+        "right_child",
+        "level",
+        "split_feat",
+    ]
 
     ctree = pd.DataFrame(ctree_array, columns=column_names)
-    ctree[["id", "left_child", "right_child", "level", "split_feat"]] = ctree[
-        ["id", "left_child", "right_child", "level", "split_feat"]
-    ].astype("Int64")
+    ctree[columns_to_int] = ctree[columns_to_int].astype("Int64")
 
     ctree = ctree.set_index("id").sort_index()
     return ctree
