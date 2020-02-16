@@ -150,7 +150,8 @@ class CausalForest:
                 "method cannot be called.",
                 UserWarning,
             )
-        if not isinstance(X, np.ndarray) or not isinstance(X, pd.DataFrame):
+            return None
+        if not isinstance(X, np.ndarray) and not isinstance(X, pd.DataFrame):
             raise TypeError(
                 "Data on new features *X* is not a pd.DataFrame or np.array."
             )
@@ -211,11 +212,19 @@ class CausalForest:
             return None
 
         candidate_model = pd.read_csv(filename)
+        try:
+            candidate_model = candidate_model.set_index(["tree_id", "node_id"])
+        except KeyError:
+            raise KeyError(
+                "The file to load needs to have its first two"
+                "columns to be 'tree_id' and 'node_id'"
+            )
         _assert_df_is_valid_causal_forest(candidate_model)
 
         fitted_model = _update_dtypes(candidate_model)
         self.fitted_model = fitted_model
-        return None
+        self._is_fitted = True
+        return self
 
 
 def fit_causalforest(X, t, y, forest_params, tree_params, seed_counter=1000):
@@ -332,27 +341,21 @@ def _assert_data_input_causal_forest(X, t, y):
 
     """
     # assert dtype of features *X*
-    if not isinstance(X, np.ndarray) or not isinstance(X, pd.DataFrame):
+    if isinstance(X, np.ndarray):
+        if np.isnan(np.sum(X)):
+            raise ValueError("Data on features *X* contains NaNs.")
+        nx, p = X.shape
+    elif isinstance(X, pd.DataFrame):
+        if X.isnull().any().any():
+            raise ValueError("Data on features *X* contains NaNs.")
+        nx, p = X.shape
+    else:
         raise TypeError(
             "Data on features *X* is not a pd.DataFrame or np.array."
         )
-    elif isinstance(X, np.ndarray):
-        if np.isnan(np.sum(X)):
-            raise ValueError("Data on features *X* contains NaNs.")
-        else:
-            nx, p = X.shape
-    else:
-        if X.isnull().any().any():
-            raise ValueError("Data on features *X* contains NaNs.")
-        else:
-            nx, p = X.shape
 
     # assert dtype of treatment status *t*
-    if not isinstance(t, np.ndarray) or not isinstance(t, pd.Series):
-        raise TypeError(
-            "Data on treatment status *t* is not a pd.Series or np.array."
-        )
-    elif isinstance(t, np.ndarray):
+    if isinstance(t, np.ndarray):
         if np.isnan(np.sum(t)):
             raise ValueError("Data on treatment status *t* contains NaNs.")
         else:
@@ -361,7 +364,7 @@ def _assert_data_input_causal_forest(X, t, y):
                     "Data on treatment status *t* is not boolean."
                 )
             nt = len(t)
-    else:
+    elif isinstance(t, pd.Series):
         if t.isnull().any():
             raise ValueError("Data on treatment status *t* contains NaNs.")
         else:
@@ -370,20 +373,22 @@ def _assert_data_input_causal_forest(X, t, y):
                     "Data on treatment status *t* is not boolean."
                 )
             nt = len(t)
+    else:
+        raise TypeError(
+            "Data on treatment status *t* is not a pd.Series or np.array."
+        )
 
     # assert dtype of outcomes *y*
-    if not isinstance(y, np.ndarray) or not isinstance(y, pd.Series):
-        raise TypeError("Data on outcomes *y* is not a pd.Series or np.array.")
-    elif isinstance(y, np.ndarray):
+    if isinstance(y, np.ndarray):
         if np.isnan(np.sum(y)):
             raise ValueError("Data on outcomes *y* contains NaNs.")
-        else:
-            ny = len(y)
-    else:
+        ny = len(y)
+    elif isinstance(y, pd.Series):
         if y.isnull().any():
             raise ValueError("Data on outcomes *y* contains NaNs.")
-        else:
-            ny = len(y)
+        ny = len(y)
+    else:
+        raise TypeError("Data on outcomes *y* is not a pd.Series or np.array.")
 
     if not nx == nt == ny:
         raise ValueError("Dimensions of dat   a is not consistent.")
@@ -453,7 +458,9 @@ def _assert_df_is_valid_causal_forest(candidate_model):
     for int_col in int_columns:
         _is_int = (
             candidate_model[int_col]
-            .apply(lambda x: True if np.isnan(x) else float.is_integer(x))
+            .apply(
+                lambda x: True if np.isnan(x) else float.is_integer(float(x))
+            )
             .all()
         )
         if not _is_int:
