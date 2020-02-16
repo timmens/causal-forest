@@ -33,6 +33,7 @@ dependencies:
     - pdbpp
     - pre-commit
     - pytest
+    - pytest-cov
     - pytest-mock
     - pytest-xdist
     - restructuredtext_lint
