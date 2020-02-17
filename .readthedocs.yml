@@ -1,0 +1,10 @@
+version: 1
+
+build:
+  image: latest
+
+python:
+  version: 3.7
+
+conda:
+  environment: docs/environment.yml
