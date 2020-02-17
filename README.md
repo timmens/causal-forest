@@ -23,5 +23,5 @@ conda install -c timmens cforest
 [build-url]: https://travis-ci.org/timmens/causal-forest
 [coverage-badge]:https://codecov.io/gh/timmens/causal-forest/branch/master/graph/badge.svg
 [coverage-url]:https://codecov.io/gh/timmens/causal-forest
-[documentation-badge]:https://readthedocs.org/projects/badge-demo/badge/?version=latest
-[documentation-url]:https://badge-demo.readthedocs.io/en/latest/?badge=latest
+[documentation-badge]:https://readthedocs.org/projects/causal-forest/badge/?version=latest
+[documentation-url]:https://causal-forest.readthedocs.io/en/latest/?badge=latest
