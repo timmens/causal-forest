@@ -5,6 +5,14 @@ Implements the Causal Forest algorithm published by Athey and Wager (2018).
 [![MIT License][license-badge]][license-url]
 [![Coverage][coverage-badge]][coverage-url]
 [![Build Status][build-badge]][build-url]
+[![Documentation Status][documentation-badge]][documentation-url]
+
+
+## Install
+
+```
+conda install -c timmens cforest
+```
 
 
 [contributors-badge]: https://img.shields.io/github/contributors/timmens/causal-forest
@@ -15,3 +23,5 @@ Implements the Causal Forest algorithm published by Athey and Wager (2018).
 [build-url]: https://travis-ci.org/timmens/causal-forest
 [coverage-badge]:https://codecov.io/gh/timmens/causal-forest/branch/master/graph/badge.svg
 [coverage-url]:https://codecov.io/gh/timmens/causal-forest
+[documentation-badge]:https://readthedocs.org/projects/badge-demo/badge/?version=latest
+[documentation-url]:https://badge-demo.readthedocs.io/en/latest/?badge=latest
