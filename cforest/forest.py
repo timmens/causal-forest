@@ -13,8 +13,8 @@ from itertools import count
 import numpy as np
 import pandas as pd
 
-from causal_forest.tree.causaltree import fit_causaltree
-from causal_forest.tree.causaltree import predict_causaltree
+from cforest.tree import fit_causaltree
+from cforest.tree import predict_causaltree
 
 
 class CausalForest:
@@ -114,7 +114,7 @@ class CausalForest:
             - ValueError, if data has inconsistent shapes
 
         """
-        _assert_data_input_causal_forest(X, t, y)
+        _assert_data_input_cforest(X, t, y)
 
         fitted_model = fit_causalforest(
             X=X,
@@ -219,7 +219,7 @@ class CausalForest:
                 "The file to load needs to have its first two"
                 "columns to be 'tree_id' and 'node_id'"
             )
-        _assert_df_is_valid_causal_forest(candidate_model)
+        _assert_df_is_valid_cforest(candidate_model)
 
         fitted_model = _update_dtypes(candidate_model)
         self.fitted_model = fitted_model
@@ -320,7 +320,7 @@ def predict_causalforest(cforest, X):
     return predictions
 
 
-def _assert_data_input_causal_forest(X, t, y):
+def _assert_data_input_cforest(X, t, y):
     """Assert if input data satisfies restrictions.
 
     Asserts if input data is either a pd.DataFrame/pd.Sereis or np.array and if
@@ -396,7 +396,7 @@ def _assert_data_input_causal_forest(X, t, y):
     return True
 
 
-def _assert_df_is_valid_causal_forest(candidate_model):
+def _assert_df_is_valid_cforest(candidate_model):
     """Assert *df* represents valid causal forest.
 
     A valid causal forest model is given by a pd.DataFrame which fulfills the

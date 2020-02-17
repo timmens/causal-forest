@@ -20,8 +20,8 @@ setup(
     author_email="tim.mensinger@uni-bonn.de",
     packages=find_packages(exclude=["tests/*"]),
     #    package_data={
-    #        "causal_forest": [
-    #            "causal_forest/tests/data/*.csv",
+    #        "cforest": [
+    #            "cforest/tests/data/*.csv",
     #        ],
     #    },
     #    include_package_data=True,

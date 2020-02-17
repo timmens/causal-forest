@@ -3,12 +3,12 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
 
-from causal_forest.tree.causaltree import _compute_valid_splitting_indices
-from causal_forest.tree.causaltree import _find_optimal_split_observation_loop
-from causal_forest.tree.causaltree import _predict_row_causaltree
-from causal_forest.tree.causaltree import _retrieve_index
-from causal_forest.tree.causaltree import _transform_outcome
-from causal_forest.tree.causaltree import predict_causaltree
+from cforest.tree import _compute_valid_splitting_indices
+from cforest.tree import _find_optimal_split_observation_loop
+from cforest.tree import _predict_row_causaltree
+from cforest.tree import _retrieve_index
+from cforest.tree import _transform_outcome
+from cforest.tree import predict_causaltree
 
 
 tt = [
@@ -137,9 +137,7 @@ def test__find_optimal_split_observation_loop():
     assert abs(split_index - numsim / 2) < 15
 
 
-ctree = pd.read_csv(
-    "causal_forest/tests/data/fitted_ctree__predict_row_test.csv"
-)
+ctree = pd.read_csv("cforest/tests/data/fitted_ctree__predict_row_test.csv")
 ctree[["left_child", "right_child", "level", "split_feat"]] = ctree[
     ["left_child", "right_child", "level", "split_feat"]
 ].astype("Int64")
