@@ -15,6 +15,21 @@ Implements the Causal Forest algorithm published by Athey and Wager (2018).
 conda install -c timmens cforest
 ```
 
+## Example
+
+```
+from cforest.forest import CausalForest()
+
+X, t, y = simulate_treatment_data()
+XX = simulate_testing_features()
+
+cf = CausalForest()
+
+cf = cf.fit(X, t, y)
+
+predictions = cf.predict(XX)
+```
+
 
 [contributors-badge]: https://img.shields.io/github/contributors/timmens/causal-forest
 [contributors-url]: https://github.com/timmens/causal-forest/graphs/contributors
