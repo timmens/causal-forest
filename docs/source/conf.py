@@ -27,7 +27,9 @@ release = "0.0.1"
 
 master_doc = "index"
 
-extensions = []
+extensions = [
+    "sphinx_rtd_theme",
+]
 
 autodoc_mock_imports = [
     "numpy",
@@ -48,7 +50,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "alabaster"
+html_theme = "sphinx_rtd_theme"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
