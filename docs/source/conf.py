@@ -1,6 +1,8 @@
 import os
 import sys
 
+import sphinx_rtd_theme
+
 
 # Set variable so that todos are shown in local build
 on_rtd = os.environ.get("READTHEDOCS") == "True"
@@ -31,10 +33,7 @@ extensions = [
     "sphinx_rtd_theme",
 ]
 
-autodoc_mock_imports = [
-    "numpy",
-    "pandas",
-]
+autodoc_mock_imports = []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
