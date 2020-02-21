@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import os
 import sys
 
@@ -11,7 +13,7 @@ on_rtd = os.environ.get("READTHEDOCS") == "True"
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath("."))
+sys.path.insert(0, os.path.abspath("../.."))
 
 
 # -- Project information ------------------------------------------
@@ -30,10 +32,15 @@ release = "0.0.1"
 master_doc = "index"
 
 extensions = [
+    "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
 ]
 
-autodoc_mock_imports = []
+autodoc_mock_imports = [
+    "numpy",
+    "pandas",
+    "numba",
+]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
