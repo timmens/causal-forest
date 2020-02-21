@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
-# -*- coding: UTF-8 -*-
 """
 Module to fit a causal tree.
+
+This module provides functions to fit a causal tree and predict treatment
+effects using a fitted causal tree.
 """
 from itertools import count
 
@@ -10,59 +11,44 @@ import pandas as pd
 from numba import njit
 
 
-def fit_causaltree(y, t, x, crit_params=None, func_params=None):
-    """ Wrapper function for `_fit_node`. Sets default parameters for
-    *crit_params* and *func_params* and calls internal fitting function
-    `_fit_node`. Returns fitted tree as a pd.DataFrame.
+def fit_causaltree(X, t, y, critparams=None):
+    """Fit a causal tree on given data.
+
+    Wrapper function for `_fit_node`. Sets default parameters for
+    *crit_params* and calls internal fitting function `_fit_node`. Returns
+    fitted tree as a pd.DataFrame.
 
     Args:
-        y:
-        t:
-        x:
-        crit_params:
-        func_params:
+        X (np.array): data on features
+        t (np.array): data on treatment status
+        y (np.array): data on outcomes
+        critparams (dict): dictionary containing information on when to stop
+            splitting further, i.e., minimum number of leafs and maximum
+            depth of the tree. Default is set to 'min_leaf' = 4 and
+            'max_depth' = 20.
 
     Returns:
-        ctree (pd.DataFrame):
+        ctree (pd.DataFrame): the fitted causal tree represented as a pandas
+            data frame.
     """
-
-    if crit_params is None:
-        crit_params = {
-            "min_leaf": 3,
-            "max_depth": 25,
-        }
-
-    if func_params is None:
-
-        def metric(outcomes, estimate):
-            return np.sum((outcomes - estimate) ** 2)
-
-        def weight_loss(left_loss, right_loss, w1, w2):
-            return left_loss + right_loss
-
-        func_params = {
-            "metric": metric,
-            "weight_loss": weight_loss,
+    if critparams is None:
+        critparams = {
+            "min_leaf": 4,
+            "max_depth": 20,
         }
 
     # initialize counter object and id_params
-    counter = count()
+    counter = count(0)
     rootid = next(counter)
-    id_params = {"counter": counter, "id": rootid, "level": 0}
+    idparams = {"counter": counter, "id": rootid, "level": 0}
 
-    # initialize index
+    # initialize index (the root node considers all observations).
     n = len(y)
     index = np.full((n,), True)
 
     # fit tree
     ctree_array = _fit_node(
-        y=y,
-        t=t,
-        x=x,
-        index=index,
-        crit_params=crit_params,
-        func_params=func_params,
-        id_params=id_params,
+        X=X, t=t, y=t, index=index, critparams=critparams, idparams=idparams,
     )
 
     column_names = [
@@ -89,115 +75,115 @@ def fit_causaltree(y, t, x, crit_params=None, func_params=None):
     return ctree
 
 
-def _fit_node(y, t, x, index, crit_params, func_params, id_params):
-    """
+def _fit_node(X, t, y, index, critparams, idparams):
+    """Fits a single decision tree node recursively.
+
     Recursively split feature space until stopping criteria in *crit_params*
-    are reached.
+    are reached. In each level of recursion fit a single node.
 
     Args:
-        y:
-        t:
-        x:
-        index:
-        crit_params:
-        func_params:
-        id_params:
+        X (np.array): data on features
+        t (np.array): data on treatment status
+        y (np.array): data on outcomes
+        index (np.array): boolean index indicating which observations (rows)
+            of the data to consider for split.
+        critparams (dict): dictionary containing information on when to stop
+            splitting further, i.e., minimum number of leafs and maximum
+            depth of the tree.
+        idparams (dict): dictionary containing identification information of
+            a single node. That is, a unique id number, the level in the tree,
+            and a counter object which is passed to potential children of node.
 
     Returns:
+        out (np.array): array containing information on the splits, with
+            columns representing (nodeid, left_childid, right_childid, level,
+            split_feat).
 
     """
-    level = id_params["level"]
-    nodeid = id_params["id"]
+    level = idparams["level"]
+    nodeid = idparams["id"]
 
-    # column_names = [
-    #     "id",
-    #     "left_child",
-    #     "right_child",
-    #     "level",
-    #     "split_feat",
-    #     "split_value",
-    #     "treat_effect",
-    # ]
+    tmp = _find_optimal_split(
+        X=X, t=t, y=y, index=index, min_leaf=critparams["min_leaf"],
+    )
 
-    # df_out = pd.DataFrame(columns=column_names)
-
-    tmp = _find_optimal_split(y, t, x, index, crit_params["min_leaf"],)
-
-    if tmp is None or level == crit_params["max_depth"]:
+    if tmp is None or level == critparams["max_depth"]:
         # if we do not split the node must be a leaf, hence we add the
-        # treatment effect
+        # treatment effect to the output.
         treat_effect = _estimate_treatment_effect(y[index], t[index])
 
         info = np.array(
             [nodeid, np.nan, np.nan, level, np.nan, np.nan, treat_effect,]
         ).reshape((1, 7))
-
-        # to_append = pd.Series(info, column_names)
-        # return df_out.append(to_append, ignore_index=True)
         return info
     else:
         left, right, split_feat, split_value = tmp
 
-        leftid = next(id_params["counter"])
-        rightid = next(id_params["counter"])
+        leftid = next(idparams["counter"])
+        rightid = next(idparams["counter"])
 
         info = np.array([nodeid, leftid, rightid, level])
 
         split_info = np.array([split_feat, split_value, np.nan])
         info = np.append(info, split_info).reshape((1, 7))
-        # to_append = pd.Series(info, column_names)
-        # df_out = df_out.append(to_append, ignore_index=True)
 
-        id_params_left = id_params.copy()
-        id_params_left["id"] = leftid
-        id_params_left["level"] += 1
+        idparams_left = idparams.copy()
+        idparams_left["id"] = leftid
+        idparams_left["level"] += 1
 
-        id_params_right = id_params.copy()
-        id_params_right["id"] = rightid
-        id_params_right["level"] += 1
+        idparams_right = idparams.copy()
+        idparams_right["id"] = rightid
+        idparams_right["level"] += 1
 
         out_left = _fit_node(
-            y=y,
+            X=X,
             t=t,
-            x=x,
+            y=y,
             index=left,
-            crit_params=crit_params,
-            func_params=func_params,
-            id_params=id_params_left,
+            critparams=critparams,
+            idparams=idparams_left,
         )
         out_right = _fit_node(
-            y=y,
+            X=X,
             t=t,
-            x=x,
+            y=y,
             index=right,
-            crit_params=crit_params,
-            func_params=func_params,
-            id_params=id_params_right,
+            critparams=critparams,
+            idparams=idparams_right,
         )
 
-        # df_out = df_out.append(out_left, ignore_index=True)
-        # df_out = df_out.append(out_right, ignore_index=True)
         out = np.vstack((info, out_left))
         out = np.vstack((out, out_right))
-
-        # return df_out
         return out
 
 
-def _find_optimal_split(y, t, x, index, min_leaf):
-    """
+def _find_optimal_split(X, t, y, index, min_leaf):
+    """Compute optimal split and splitting information.
+
+    For given data, for each feature, go through all valid splitting points and
+    find the split value and split variable which result in the lowest overall
+    loss.
 
     Args:
-        y:
-        t:
-        x:
-        index:
-        min_leaf:
+        X (np.array): data on features
+        t (np.array): data on treatment status
+        y (np.array): data on outcomes
+        index (np.array): boolean index indicating which observations (rows)
+            of the data to consider for split.
+        min_leaf (int): Minimum number of observations of each type (treated,
+            untreated) allowed in a leaf; has to be greater than 1.
 
     Returns:
+        left (np.array): boolean index representing the observations falling
+            in the left leaf.
+        right (np.array): boolean index representing the observations falling
+            in the right leaf.
+        split_feat (int): index of feature on which the optimal split occurs.
+        split_value (float): value of feature on which the optimal split
+            occurs.
 
     """
-    _, p = x.shape
+    _, p = X.shape
     split_feat = None
     split_value = None
     split_index = None
@@ -206,9 +192,9 @@ def _find_optimal_split(y, t, x, index, min_leaf):
     for j in range(p):
         # loop through features
 
-        index_sorted = np.argsort(x[index, j])
+        index_sorted = np.argsort(X[index, j])
         yy = y[index][index_sorted]
-        xx = x[index, j][index_sorted]
+        xx = X[index, j][index_sorted]
         tt = t[index][index_sorted]
 
         yy_transformed = _transform_outcome(yy, tt)
@@ -217,11 +203,11 @@ def _find_optimal_split(y, t, x, index, min_leaf):
 
         # loop through observations
         tmp = _find_optimal_split_observation_loop(
-            splitting_indices, yy, yy_transformed, xx, tt, loss
+            splitting_indices, yy, yy_transformed, xx, tt, min_leaf
         )
         jloss, jsplit_value, jsplit_index = tmp
 
-        if jloss < loss:
+        if jloss < loss and jsplit_index is not None:
             split_feat = j
             split_value = jsplit_value
             split_index = jsplit_index
@@ -232,10 +218,86 @@ def _find_optimal_split(y, t, x, index, min_leaf):
         return None
 
     # create index of observations falling in left and right leaf, respectively
-    index_sorted = np.argsort(x[index, split_feat])
+    index_sorted = np.argsort(X[index, split_feat])
     left, right = _retrieve_index(index, index_sorted, split_index)
-
     return left, right, split_feat, split_value
+
+
+def _find_optimal_split_observation_loop(
+    splitting_indices, x, t, y, y_transformed, min_leaf
+):
+    """Find the optimal splitting value for data on a single feature.
+
+    Finds the optimal splitting value (in the data) given data on a single
+    feature. Note that the algorithm is essentially not different from naively
+    searching for a minimum; however, since this is computationally very costly
+    this function implements a dynamic updating procedure, in which the sums
+    get updated during the loop. See "Elements of Statistical Learning" for a
+    reference on the classical algorithm.
+
+    Args:
+        splitting_indices (np.array): valid splitting indices.
+        x (np.array): data on a single feature.
+        t (np.array): data on treatment status.
+        y (np.array): data on outcomes.
+        y_transformed (np.array): data on transformed outcomes.
+
+    Returns:
+         - (np.inf, None, None): if *splitting_indices* is empty
+         - (minimal_loss, split_value, split_index): if *splitting_indices* is
+            not empty, where minimal_loss denotes the loss occured when
+            splitting the feature axis at the split_value (= x[split_index]).
+
+    """
+    if len(splitting_indices) == 0:
+        return np.inf, None, None
+
+    # initialize number of observations
+    i0 = splitting_indices[0]
+    n_1l = int(np.sum(t[: (i0 + 1)]))
+    n_0l = int(np.sum(~t[: (i0 + 1)]))
+    n_1r = int(np.sum(t[(i0 + 1) :]))
+    n_0r = len(t) - n_1l - n_0l - n_1r
+
+    # initialize dynamic sums
+    sum_1l = y[t][: (i0 + 1)].sum()
+    sum_0l = y[~t][: (i0 + 1)].sum()
+    sum_1r = y[t][(i0 + 1) :].sum()
+    sum_0r = y[~t][(i0 + 1) :].sum()
+
+    split_value = x[i0]
+    split_index = i0
+    minimal_loss = np.inf
+
+    for i in splitting_indices:
+        if t[i]:
+            sum_1l += y[i]
+            sum_1r -= y[i]
+            n_1l += 1
+            n_1r -= 1
+        else:
+            sum_0l += y[i]
+            sum_0r -= y[i]
+            n_0l += 1
+            n_0r -= 1
+
+        # this should not happen but it does for some reason
+        if n_0r < min_leaf or n_1r < min_leaf:
+            break
+
+        left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
+        right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
+
+        left_loss = ((y_transformed[: (i + 1)] - left_te) ** 2).sum()
+        right_loss = ((y_transformed[(i + 1) :] - right_te) ** 2).sum()
+
+        global_loss = left_loss + right_loss
+        if global_loss < minimal_loss:
+            split_value = x[i]
+            split_index = i
+            minimal_loss = global_loss
+
+    return minimal_loss, split_value, split_index
 
 
 def _compute_valid_splitting_indices(t, min_leaf):
@@ -296,137 +358,61 @@ def _compute_valid_splitting_indices(t, min_leaf):
 
 
 def _transform_outcome(y, t):
-    """
-    Transforms outcome using naive propensity scores (Prob[`t`=1] = 1/2).
-    TODO: Implement general transformation using propensity scores.
+    """Transform outcome.
 
-    :param y: (n,) np.array containing outcomes
-    :param t: (n,) np.array (bool) containing treatment status
-    :return: (n,) np.array of transformed outcomes
+    Transforms outcome using approximate propensity scores. Equation is as
+    follows:
+        \tilde{y}_i = 2 * y_i * t_i - 2 * y_i * (1 - t_i),
+    where t_i denotes the treatment status of the ith individual. This object
+    is equivalent to the individual treatment effect in expectation.
+
+    Args:
+        y (np.array): data on outcomes.
+        t (np.arra): boolean data on treatment status.
+
+    Returns:
+        y_transformed (np.array): the transformed outcome.
+
+    Example:
+    >>> import numpy as np
+    >>> y = np.array([-1, 0, 1])
+    >>> t = np.array([True, True, False])
+    >>> _transform_outcome(y, t)
+    array([-2, 0, -2])
+
     """
     y_transformed = 2 * y * t - 2 * y * (1 - t)
-
     return y_transformed
 
 
-def _find_optimal_split_observation_loop(
-    splitting_indices, yy, yy_transformed, xx, tt, loss
-):
-    """
-
-    Args:
-        splitting_indices:
-        yy:
-        yy_transformed:
-        xx:
-        tt:
-        loss:
-
-    Returns:
-
-    """
-    if len(splitting_indices) == 0:
-        return loss, None, None
-
-    split_value = None
-    split_index = None
-    squared_sum_transformed = (yy_transformed ** 2).sum()
-    minimal_loss = loss - squared_sum_transformed
-
-    i0 = splitting_indices[0]
-    n_1l = np.sum(tt[: (i0 + 1)])
-    n_0l = np.sum(~tt[: (i0 + 1)])
-    n_1r = np.sum(tt[(i0 + 1) :])
-    n_0r = len(tt) - n_1l - n_0l - n_1r
-
-    sum_1l = yy[tt][: (i0 + 1)].sum()
-    sum_0l = yy[~tt][: (i0 + 1)].sum()
-    sum_1r = yy[tt][(i0 + 1) :].sum()
-    sum_0r = yy[~tt][(i0 + 1) :].sum()
-
-    left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
-    right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
-
-    left_loss = _compute_loss_raw_left(yy_transformed, i0, left_te)
-    right_loss = _compute_loss_raw_right(yy_transformed, i0, right_te)
-
-    global_loss = left_loss + right_loss
-    if global_loss < minimal_loss:
-        split_value = xx[i0]
-        split_index = i0
-        minimal_loss = global_loss
-
-    for i in splitting_indices[1:]:
-
-        if tt[i]:
-            sum_1l += yy[i]
-            sum_1r -= yy[i]
-            n_1l += 1
-            n_1r -= 1
-        else:
-            sum_0l += yy[i]
-            sum_0r -= yy[i]
-            n_0l += 1
-            n_0r -= 1
-
-        left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
-        right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
-
-        left_loss = _compute_loss_raw_left(yy_transformed, i, left_te)
-        right_loss = _compute_loss_raw_right(yy_transformed, i, right_te)
-
-        global_loss = left_loss + right_loss
-        # global_loss = loss_weighting(
-        #     left_loss, right_loss, i + 1, len(yy) - i - 1
-        # )
-        if global_loss < minimal_loss:
-            split_value = xx[i]
-            split_index = i
-            minimal_loss = global_loss
-
-    return minimal_loss + squared_sum_transformed, split_value, split_index
-
-
 def _estimate_treatment_effect(y, t):
-    """
+    """Estimate the average treatment effect.
+
     Estimates average treatment effect (ATE) using outcomes *y* and treatment
     status *t*.
 
     Args:
-        y (np.array): 1d array containing outcomes
-        t (np.array): 1d array containing the treatment status as treated =
-            True and untreated = False.
+        y (np.array): data on outcomes.
+        t (np.array): boolean data on treatment status.
 
     Returns:
-        out (float): the estimated treatment effect
+        out (float): the estimated treatment effect.
+
+    Example:
+    >>> import numpy as np
+    >>> y = np.array([-1, 0, 1, 2, 3, 4])
+    >>> t = np.array([False, False, False, True, True, True])
+    >>> _estimate_treatment_effect(y, t)
+    3
 
     """
     out = y[t].mean() - y[~t].mean()
     return out
 
 
-@njit
-def _weight_loss(left_loss, right_loss, n_left, n_right):
-    """
-    Given loss in a left leaf (`left_loss`)  and right leaf (`right_loss`) and
-    the number of observations falling in the left and right leaf, `n_left` and
-    `n_right`, respectively, computes a weighted combination of the losses
-    and returns a single scalar output.
-
-    :param left_loss: loss in left leaf
-    :param right_loss: loss in right leaf
-    :param n_left: no. of observations falling in left leaf
-    :param n_right: no. of observations falling in right leaf
-    :return: weightes loss scalar (float)
-    """
-    left = (n_left / (n_left + n_right)) * left_loss
-    right = (n_right / (n_left + n_right)) * right_loss
-
-    return left + right
-
-
 def _retrieve_index(index, sorted_subset_index, split_index):
-    """
+    """Get index of left and right leaf relative to complete data set.
+
     Given an array of indices *index* of length of the original data set, and
     a sorted index array *index_sorted* (sorted with respect to the feature
     on which we split; see function _find_optimal_split) and an index on which
@@ -435,15 +421,32 @@ def _retrieve_index(index, sorted_subset_index, split_index):
     falling falling left and right to the splitting point, respectively.
 
     Args:
-        index (np.array): boolean
-        sorted_subset_index (np.array): int
-        split_index (int):
+        index (np.array): boolean array indicating which observations (rows)
+            of the data to consider for split.
+        sorted_subset_index (np.array): array containing indices, sorted with
+            respect to the feature under consideration. Length is equal to the
+            number of True values in *index*.
+        split_index (int): index in *sorted_subset_index* corresponding to the
+            split.
 
     Returns:
         out: 2d tuple containing np.arrays left_index and right_index the same
             length as *index*
 
+    Example:
+    >>> import numpy as np
+    >>> index = np.array([True, True, True, False, False, True])
+    >>> sorted_subset_index = np.array([0, 3, 1, 2])
+    >>> split_index = 1
+    >>> _retrieve_index(index, sorted_subset_index, split_index)
+    (array([ True, False, False, False, False,  True]),
+     array([False,  True,  True, False, False, False]))
+
     """
+    # Not solving the bug:
+    if split_index is None:
+        return index
+
     left = sorted_subset_index[: (split_index + 1)]
     right = sorted_subset_index[(split_index + 1) :]
     nonzero_index = np.nonzero(index)[0]
@@ -457,8 +460,6 @@ def _retrieve_index(index, sorted_subset_index, split_index):
     left_index[nonzero_index[left]] = True
     right_index[nonzero_index[right]] = True
 
-    # global_split_index = nonzero_index[index_sorted[split_index]]
-
     out = left_index, right_index
     return out
 
@@ -467,17 +468,18 @@ def _retrieve_index(index, sorted_subset_index, split_index):
 def _compute_treatment_effect_raw(
     sum_treated, n_treated, sum_untreated, n_untreated
 ):
-    """
-    Computes average treatment effect (ATE) using the sum of outcomes of
+    """Compute the average treatment effect.
+
+    Computes the average treatment effect (ATE) using the sum of outcomes of
     treated and untreated observations (*sum_treated* and *sum_untreated*) and
     the number of treated and untreated observations (*n_treated* and
     *n_untreated*).
 
     Args:
-        sum_treated:
-        n_treated:
-        sum_untreated:
-        n_untreated:
+        sum_treated (float): sum of outcomes of treatment individuals.
+        n_treated (int): number of treated individuals.
+        sum_untreated (float): sum of outcomes of untreated individuals.
+        n_untreated (int): number of untreated individuals.
 
     Returns:
         out (float): the estimated treatment effect
@@ -487,35 +489,7 @@ def _compute_treatment_effect_raw(
     return out
 
 
-def _compute_loss_raw_left(yy_transformed, i, te):
-    """
-
-    Args:
-        yy_transformed:
-        i:
-        te:
-
-    Returns:
-
-    """
-    return te ** 2 - 2 * te * yy_transformed[: (i + 1)].sum()
-
-
-def _compute_loss_raw_right(yy_transformed, i, te):
-    """
-
-    Args:
-        yy_transformed:
-        i:
-        te:
-
-    Returns:
-
-    """
-    return te ** 2 - 2 * te * yy_transformed[(i + 1) :].sum()
-
-
-def predict_causaltree(ctree, x):
+def predict_causaltree(ctree, X):
     """Predicts individual treatment effects for a causal tree.
 
     Predicts individual treatment effects for new observed features *x*
@@ -523,16 +497,15 @@ def predict_causaltree(ctree, x):
 
     Args:
         ctree (pd.DataFrame): fitted causal tree represented in a pd.DataFrame
-        x (np.array): 2d array of new observations for which we predict the
-            individual treatment effect.
+        X (np.array): data on new observations
 
     Returns:
-        predictions (np.array): 1d array of treatment predictions.
+        predictions (np.array): treatment predictions.
 
     """
-    n, _ = x.shape
+    n = len(X)
     predictions = np.empty((n,))
-    for i, row in enumerate(x):
+    for i, row in enumerate(X):
         predictions[i] = _predict_row_causaltree(ctree, row)
 
     return predictions

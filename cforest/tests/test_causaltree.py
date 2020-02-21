@@ -126,7 +126,12 @@ def test__find_optimal_split_observation_loop():
     loss = np.inf
 
     result = _find_optimal_split_observation_loop(
-        splitting_indices, y, y_transformed, x, t, loss
+        splitting_indices=splitting_indices,
+        x=x,
+        t=t,
+        y=y,
+        y_transformed=y_transformed,
+        min_leaf=4,
     )
 
     _, split_value, split_index = result
