@@ -10,7 +10,6 @@ source:
 build:
   number: 0
 
-
 requirements:
   build:
     - python {{ python }}
@@ -18,19 +17,9 @@ requirements:
 
   run:
     - python {{ python }}
-    # - joblib
     - numpy>=1.16.0
     - pandas>=0.24
-    - numba
-
-#test:
-#  commands:
-#    - pytest
-#  files:
-#    - causal_forest/tests/
-#  requires:
-#    - pytest
-#    - conda-build
+    - numba>=0.12
 
 about:
   home: https://github.com/timmens/causal-forest

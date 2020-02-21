@@ -19,11 +19,6 @@ setup(
     author="Tim Mensinger",
     author_email="tim.mensinger@uni-bonn.de",
     packages=find_packages(exclude=["tests/*"]),
-    #    package_data={
-    #        "cforest": [
-    #            "cforest/tests/data/*.csv",
-    #        ],
-    #    },
-    #    include_package_data=True,
     zip_safe=False,
+    # install_requires=["numpy", "pandas", "numba"],
 )
