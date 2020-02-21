@@ -30,6 +30,7 @@ def fit_causaltree(X, t, y, critparams=None):
     Returns:
         ctree (pd.DataFrame): the fitted causal tree represented as a pandas
             data frame.
+
     """
     if critparams is None:
         critparams = {
@@ -301,7 +302,8 @@ def _find_optimal_split_observation_loop(
 
 
 def _compute_valid_splitting_indices(t, min_leaf):
-    """
+    """Compute valid split indices for treatment array *t* given *min_leaf*.
+
     Given an array *t* of treatment status and an integer *min_leaf* --denoting
     the minimum number of allowed observations of each type in a leaf node--
     computes a sequence of indices on which we can split *t* and get that each
@@ -361,10 +363,9 @@ def _transform_outcome(y, t):
     """Transform outcome.
 
     Transforms outcome using approximate propensity scores. Equation is as
-    follows:
-        \tilde{y}_i = 2 * y_i * t_i - 2 * y_i * (1 - t_i),
-    where t_i denotes the treatment status of the ith individual. This object
-    is equivalent to the individual treatment effect in expectation.
+    follows: tilde{y}_i = 2 * y_i * t_i - 2 * y_i * (1 - t_i), where t_i
+    denotes the treatment status of the ith individual. This object is
+    equivalent to the individual treatment effect in expectation.
 
     Args:
         y (np.array): data on outcomes.
@@ -440,7 +441,7 @@ def _retrieve_index(index, sorted_subset_index, split_index):
     >>> split_index = 1
     >>> _retrieve_index(index, sorted_subset_index, split_index)
     (array([ True, False, False, False, False,  True]),
-     array([False,  True,  True, False, False, False]))
+    array([False,  True,  True, False, False, False]))
 
     """
     # Not solving the bug:
