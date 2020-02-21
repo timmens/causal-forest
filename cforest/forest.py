@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: UTF-8 -*-
 """
 Module to fit a causal forest.
 
-This module uses the causal tree algorithm from `algorithm.causaltree.py` to
-fit a causal forest on given data.
+This module provides functions to fit a causal forest. Most importantly it
+provides the wrapper class `CausalForest`, which can be used to fit a causal
+forest, load a fitted model from disc, save a fitted model to disc and predict
+treatment effects on new data.
 """
 import glob
 import warnings
@@ -33,12 +33,22 @@ class CausalForest:
 
 
     Attributes:
-        forest_params (dict):
-        tree_params (dict):
+        forestparams (dict): Hyperparameters for forest. Has to include
+            'num_trees' (int) and 'ratio_features_at_split' (in [0, 1]).
+        treeparams (dict): Parameters for tree. Has to include 'min_leaf'
+            (int) and 'max_depth' (int).
+        _is_fitted (bool): True if the `fit` method was called or a fitted
+            model was loaded using the `load` method and False otherwise.
+        _num_features (int): number of features in design matrix that was used
+            to fit the model. If forest has not been fitted is set to None.
+        fitted_model (pd.DataFrame): a data frame representing the fitted
+            model, see function `_assert_df_is_valid_cforest` for a detailed
+            description of how a data frame represents a causal forest model.
+        seed_counter (generator): a seed generator object.
 
     """
 
-    def __init__(self, forest_params=None, tree_params=None, seed_counter=1):
+    def __init__(self, forestparams=None, treeparams=None, seed_counter=1):
         """Initiliazes CausalForest estimator with hyperparameters.
 
         Initializes CausalForest estimator with hyperparameters for the forest,
@@ -49,9 +59,9 @@ class CausalForest:
         a leaf node and the maximum depth of a tree.
 
         Args:
-            forest_params (dict): Hyperparameters for forest. Has to include
+            forestparams (dict): Hyperparameters for forest. Has to include
                 'num_trees' (int) and 'ratio_features_at_split' (in [0, 1]).
-            tree_params (dict): Parameters for tree. Has to include 'min_leaf'
+            treeparams (dict): Parameters for tree. Has to include 'min_leaf'
                 (int) and 'max_depth' (int).
         """
         self._is_fitted = False
@@ -59,41 +69,39 @@ class CausalForest:
         self.fitted_model = None
         self.seed_counter = seed_counter
 
-        if forest_params is None:
+        if forestparams is None:
             self.forest_params = {
                 "num_trees": 100,
                 "ratio_features_at_split": 0.5,
             }
         else:
-            if not isinstance(forest_params, dict):
-                raise TypeError(
-                    "Argument *forest_params* is not a dictionary."
-                )
+            if not isinstance(forestparams, dict):
+                raise TypeError("Argument *forestparams* is not a dictionary.")
 
-            if {"num_trees", "ratio_features_at_split"} != set(forest_params):
+            if {"num_trees", "ratio_features_at_split"} != set(forestparams):
                 raise ValueError(
-                    "Argument *forst_params* does not contain the correct "
+                    "Argument *forstparams* does not contain the correct "
                     "parameter 'num_trees' and 'ratio_features_at_split'."
                 )
 
-            self.forest_params = forest_params
+            self.forestparams = forestparams
 
-        if tree_params is None:
-            self.tree_params = {
-                "min_leaf": 5,
-                "max_depth": 25,
+        if treeparams is None:
+            self.treeparams = {
+                "min_leaf": 4,
+                "max_depth": 20,
             }
         else:
-            if not isinstance(tree_params, dict):
-                raise TypeError("Argument *tree_params* is not a dictionary.")
+            if not isinstance(treeparams, dict):
+                raise TypeError("Argument *treeparams* is not a dictionary.")
 
-            if {"min_leaf", "max_depth"} != set(tree_params):
+            if {"min_leaf", "max_depth"} != set(treeparams):
                 raise ValueError(
-                    "Argument *tree_params* does not contain the correct "
+                    "Argument *treeparams* does not contain the correct "
                     "parameter 'min_leaf' and 'max_depth'."
                 )
 
-            self.tree_params = tree_params
+            self.treeparams = treeparams
 
     def fit(self, X, t, y):
         """Fits causal forest on supplied data.
@@ -120,8 +128,8 @@ class CausalForest:
             X=X,
             t=t,
             y=y,
-            forest_params=self.forest_params,
-            tree_params=self.tree_params,
+            forestparams=self.forestparams,
+            treeparams=self.treeparams,
             seed_counter=self.seed_counter,
         )
         self.fitted_model = fitted_model
@@ -227,7 +235,7 @@ class CausalForest:
         return self
 
 
-def fit_causalforest(X, t, y, forest_params, tree_params, seed_counter=1000):
+def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter=1000):
     """Fits a causal forest on given data.
 
     Fits a causal forest using data on outcomes *y*, treatment status *t*
@@ -238,8 +246,8 @@ def fit_causalforest(X, t, y, forest_params, tree_params, seed_counter=1000):
         X (np.array): 2d array containing numerical features
         t (np.array): 1d (boolean) array containing treatment status
         y (np.array): 1d array containing outcomes
-        forest_params (dict): dictionary containing hyperparameters for forest
-        tree_params (dict): dictionary containing parameters for tree
+        forestparams (dict): dictionary containing hyperparameters for forest
+        treeparams (dict): dictionary containing parameters for tree
         seed_counter (int): number where to start the seed counter
 
     Returns:
@@ -249,8 +257,8 @@ def fit_causalforest(X, t, y, forest_params, tree_params, seed_counter=1000):
     """
     n = len(y)
     counter = count(seed_counter)
-    num_trees = forest_params["num_trees"]
-    ratio_features_at_split = forest_params["ratio_features_at_split"]
+    num_trees = forestparams["num_trees"]
+    ratio_features_at_split = forestparams["ratio_features_at_split"]
 
     cforest = []
     for _i in range(num_trees):
@@ -260,7 +268,7 @@ def fit_causalforest(X, t, y, forest_params, tree_params, seed_counter=1000):
             y[resample_index],
             t[resample_index],
             X[resample_index],
-            tree_params,
+            treeparams,
         )
         cforest.append(ctree)
 
@@ -400,28 +408,25 @@ def _assert_df_is_valid_cforest(candidate_model):
     """Assert *df* represents valid causal forest.
 
     A valid causal forest model is given by a pd.DataFrame which fulfills the
-    following criteria:
-    1 (MultiIndex). The data frame *df* must have a MultiIndex with the
-    first layer 'tree_id' and the second layer 'node_id'.
+    following criteria: 1 (MultiIndex). The data frame *df* must have a
+    MultiIndex with the first layer 'tree_id' and the second layer 'node_id'.
     2 (Column names). The column names of *df* must match exactly with
     ["left_child", "right_child", "level", "split_feat", "split_value",
-    "treat_effect"]
-    3 (Column dtype).
-    left_child: int
-    right_child: int
-    level: int
-    split_feat: int
-    split_value: float
-    treat_effect: float
+    "treat_effect"] 3 (Column dtype). The dtypes of columns have to represent
+    (column: dtype) left_child: int; right_child: int; level: int;
+    split_feat: int; split_value: float; treat_effect: float.
 
     Args:
-        candidate_model (pd.DataFrame): a candidate fitted model
+        candidate_model (pd.DataFrame): a data frame representing a causal
+            forest model, which might have columns that represent integer
+            dtypes but are stored as floats.
 
-    Returns: True if *df* constitutes a valid causal forest and raises Error
-        otherwise
+    Returns: True if *candidate_model* constitutes a valid causal forest and
+        raises Error otherwise.
 
     Raises:
-        ValueError, if *df* does represent a valid causal forest model.
+        ValueError, if *candidate_model* does not represent a valid causal
+        forest model.
 
     """
     # MultiIndex
@@ -470,16 +475,18 @@ def _assert_df_is_valid_cforest(candidate_model):
 
 
 def _update_dtypes(candidate_model):
-    """Update dtypes of specific columns candidate_model from float to int.
+    """Update dtypes of specific columns from float to int.
 
-    Updates dtypes of candidate_model so that columns representing integer
+    Updates dtypes of *candidate_model* so that columns representing integer
     are set to integers.
 
     Args:
-        candidate_model (pd.DataFrame):
+        candidate_model (pd.DataFrame): a data frame representing a causal
+            forest model, which might have columns that represent integer
+            dtypes but are stored as floats.
 
     Returns:
-        fitted_model (pd.DataFrame): updated model
+        fitted_model (pd.DataFrame): updated model.
 
     """
     columns_to_int = [
