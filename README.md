@@ -1,5 +1,4 @@
 # causal-forest
-Implements the Causal Forest algorithm published by Athey and Wager (2018).
 
 [![Contributors][contributors-badge]][contributors-url]
 [![MIT License][license-badge]][license-url]
@@ -8,16 +7,28 @@ Implements the Causal Forest algorithm published by Athey and Wager (2018).
 [![Documentation Status][documentation-badge]][documentation-url]
 [![Black Code Style][black-badge]][black-url]
 
+## Introduction
+
+Implements the Causal Forest algorithm published by Athey and Wager (2018).
+
 
 ## Install
 
-```
+The package can be installed via conda. To do so, type the following commands in a terminal:
+
+```console
 conda install -c timmens cforest
 ```
 
+
+## Documentation
+
+The documentation is hosted at https://causal-forest.readthedocs.io/en/latest/.
+
+
 ## Example
 
-```
+```python
 from cforest.forest import CausalForest()
 
 X, t, y = simulate_treatment_data()
@@ -29,6 +40,15 @@ cf = cf.fit(X, t, y)
 
 predictions = cf.predict(XX)
 ```
+
+## References
+
+- Athey and Imbens, 2016, [Estimation and Inference of Heterogeneous Treatment Effects using Random Forests](https://www.tandfonline.com/doi/full/10.1080/01621459.2017.1319839)
+
+- Athey and Wager, 2019, [Recursive partitioning for heterogeneous causal effects](https://www.pnas.org/content/113/27/7353)
+
+- Athey, Tibshirani and Wager, 2019, [Generalized random forests](https://projecteuclid.org/euclid.aos/1547197251)
+
 
 
 [contributors-badge]: https://img.shields.io/github/contributors/timmens/causal-forest
