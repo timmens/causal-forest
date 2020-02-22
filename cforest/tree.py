@@ -49,7 +49,7 @@ def fit_causaltree(X, t, y, critparams=None):
 
     # fit tree
     ctree_array = _fit_node(
-        X=X, t=t, y=t, index=index, critparams=critparams, idparams=idparams,
+        X=X, t=t, y=y, index=index, critparams=critparams, idparams=idparams,
     )
 
     column_names = [
@@ -198,13 +198,20 @@ def _find_optimal_split(X, t, y, index, min_leaf):
         xx = X[index, j][index_sorted]
         tt = t[index][index_sorted]
 
-        yy_transformed = _transform_outcome(yy, tt)
+        yy_transformed = _transform_outcome(y=yy, t=tt)
 
-        splitting_indices = _compute_valid_splitting_indices(tt, min_leaf)
+        splitting_indices = _compute_valid_splitting_indices(
+            t=tt, min_leaf=min_leaf
+        )
 
         # loop through observations
         tmp = _find_optimal_split_observation_loop(
-            splitting_indices, yy, yy_transformed, xx, tt, min_leaf
+            splitting_indices=splitting_indices,
+            x=xx,
+            t=tt,
+            y=yy,
+            y_transformed=yy_transformed,
+            min_leaf=min_leaf,
         )
         jloss, jsplit_value, jsplit_index = tmp
 
@@ -220,7 +227,9 @@ def _find_optimal_split(X, t, y, index, min_leaf):
 
     # create index of observations falling in left and right leaf, respectively
     index_sorted = np.argsort(X[index, split_feat])
-    left, right = _retrieve_index(index, index_sorted, split_index)
+    left, right = _retrieve_index(
+        index=index, sorted_subset_index=index_sorted, split_index=split_index
+    )
     return left, right, split_feat, split_value
 
 
@@ -268,9 +277,20 @@ def _find_optimal_split_observation_loop(
 
     split_value = x[i0]
     split_index = i0
-    minimal_loss = np.inf
+    minimal_loss = _compute_global_loss(
+        sum_0l=sum_0l,
+        sum_1l=sum_1l,
+        sum_0r=sum_0r,
+        sum_1r=sum_1r,
+        n_0l=n_0l,
+        n_1l=n_1l,
+        n_0r=n_0r,
+        n_1r=n_1r,
+        y_transformed=y_transformed,
+        i=i0,
+    )
 
-    for i in splitting_indices:
+    for i in splitting_indices[1:]:
         if t[i]:
             sum_1l += y[i]
             sum_1r -= y[i]
@@ -282,23 +302,63 @@ def _find_optimal_split_observation_loop(
             n_0l += 1
             n_0r -= 1
 
-        # this should not happen but it does for some reason
+        # this should not happen but it does for some reason (Bug alarm!)
         if n_0r < min_leaf or n_1r < min_leaf:
             break
+        if n_0l < min_leaf or n_1l < min_leaf:
+            continue
 
-        left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
-        right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
-
-        left_loss = ((y_transformed[: (i + 1)] - left_te) ** 2).sum()
-        right_loss = ((y_transformed[(i + 1) :] - right_te) ** 2).sum()
-
-        global_loss = left_loss + right_loss
+        global_loss = _compute_global_loss(
+            sum_0l=sum_0l,
+            sum_1l=sum_1l,
+            sum_0r=sum_0r,
+            sum_1r=sum_1r,
+            n_0l=n_0l,
+            n_1l=n_1l,
+            n_0r=n_0r,
+            n_1r=n_1r,
+            y_transformed=y_transformed,
+            i=i,
+        )
         if global_loss < minimal_loss:
             split_value = x[i]
             split_index = i
             minimal_loss = global_loss
 
     return minimal_loss, split_value, split_index
+
+
+def _compute_global_loss(
+    sum_1l, n_1l, sum_0l, n_0l, sum_1r, n_1r, sum_0r, n_0r, y_transformed, i
+):
+    """Compute global loss when splitting at index *i*.
+
+    Computes global loss when splitting the observation set at index *i*
+    using the dynamically updated sums and number of observations.
+
+    Args:
+        sum_1l:
+        n_1l:
+        sum_0l:
+        n_0l:
+        sum_1r:
+        n_1r:
+        sum_0r:
+        n_0r:
+        y_transformed:
+
+    Returns:
+        global_loss (float): the occured loss.
+
+    """
+    left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
+    right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
+
+    left_loss = ((y_transformed[: (i + 1)] - left_te) ** 2).sum()
+    right_loss = ((y_transformed[(i + 1) :] - right_te) ** 2).sum()
+
+    global_loss = left_loss + right_loss
+    return global_loss
 
 
 def _compute_valid_splitting_indices(t, min_leaf):

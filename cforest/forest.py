@@ -33,18 +33,29 @@ class CausalForest:
 
 
     Attributes:
-        forestparams (dict): Hyperparameters for forest. Has to include
-            'num_trees' (int) and 'ratio_features_at_split' (in [0, 1]).
-        treeparams (dict): Parameters for tree. Has to include 'min_leaf'
-            (int) and 'max_depth' (int).
-        _is_fitted (bool): True if the `fit` method was called or a fitted
-            model was loaded using the `load` method and False otherwise.
-        _num_features (int): number of features in design matrix that was used
-            to fit the model. If forest has not been fitted is set to None.
-        fitted_model (pd.DataFrame): a data frame representing the fitted
-            model, see function `_assert_df_is_valid_cforest` for a detailed
-            description of how a data frame represents a causal forest model.
-        seed_counter (generator): a seed generator object.
+        forestparams (dict):
+            Hyperparameters for forest. Has to include 'num_trees' (int) and
+            'ratio_features_at_split' (in [0, 1]).
+
+        treeparams (dict):
+            Parameters for tree. Has to include 'min_leaf' (int) and
+            'max_depth' (int).
+
+        _is_fitted (bool):
+            True if the `fit` method was called or a fitted model was loaded
+            using the `load` method and False otherwise.
+
+        _num_features (int):
+            Number of features in design matrix that was used to fit the model.
+            If forest has not been fitted is set to None.
+
+        fitted_model (pd.DataFrame):
+            Data frame representing the fitted model, see function
+            `_assert_df_is_valid_cforest` for a detailed description of how a
+            data frame represents a causal forest model.
+
+        seed_counter (generator):
+            Seed generator object.
 
     """
 
@@ -208,7 +219,7 @@ class CausalForest:
                 and do nothing otherwise.
 
         Returns:
-            None
+            self: the fitted regressor.
 
         """
         if self._is_fitted and not overwrite_fitted_model:
@@ -235,7 +246,7 @@ class CausalForest:
         return self
 
 
-def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter=1000):
+def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
     """Fits a causal forest on given data.
 
     Fits a causal forest using data on outcomes *y*, treatment status *t*
@@ -265,10 +276,10 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter=1000):
         seed = next(counter)
         resample_index = _draw_resample_index(n, seed)
         ctree = fit_causaltree(
-            y[resample_index],
-            t[resample_index],
-            X[resample_index],
-            treeparams,
+            X=X[resample_index, :],
+            t=t[resample_index],
+            y=y[resample_index],
+            critparams=treeparams,
         )
         cforest.append(ctree)
 
@@ -399,7 +410,7 @@ def _assert_data_input_cforest(X, t, y):
         raise TypeError("Data on outcomes *y* is not a pd.Series or np.array.")
 
     if not nx == nt == ny:
-        raise ValueError("Dimensions of dat   a is not consistent.")
+        raise ValueError("Dimensions of data are inconsistent.")
 
     return True
 
