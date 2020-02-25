@@ -7,6 +7,12 @@
 [![Documentation Status][documentation-badge]][documentation-url]
 [![Black Code Style][black-badge]][black-url]
 
+## Word of warning
+
+The package is still in development stage and should not be used other than for
+experimental reasons.
+With version 0.1.0 we will benchmark our code against existing code.
+
 ## Introduction
 
 Implements the Causal Forest algorithm published by Athey and Wager (2018).
