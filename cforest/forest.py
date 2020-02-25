@@ -8,6 +8,7 @@ treatment effects on new data.
 """
 import glob
 import warnings
+from copy import deepcopy
 from itertools import count
 
 import numpy as np
@@ -266,27 +267,32 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
             data frame.
 
     """
-    n = len(y)
+    try:
+        n, p = X.shape
+    except ValueError:
+        n, p = len(X), 1
+
     counter = count(seed_counter)
     num_trees = forestparams["num_trees"]
     ratio_features_at_split = forestparams["ratio_features_at_split"]
 
-    cforest = []
+    ctrees = []
+    features = []
     for _i in range(num_trees):
         seed = next(counter)
         resample_index = _draw_resample_index(n, seed)
+        feature_index = _draw_feature_index(p, ratio_features_at_split, seed)
+
         ctree = fit_causaltree(
-            X=X[resample_index, :],
+            X=X[resample_index][:, feature_index],
             t=t[resample_index],
             y=y[resample_index],
             critparams=treeparams,
         )
-        cforest.append(ctree)
+        ctrees.append(ctree)
+        features.append(feature_index)
 
-    cforest = pd.concat(
-        cforest, keys=range(num_trees), names=["tree_id", "node_id"]
-    )
-
+    cforest = _construct_forest_df_from_trees(ctrees, features)
     return cforest
 
 
@@ -295,14 +301,14 @@ def _draw_resample_index(n, seed):
 
     Draw indices with replacement from the discrete uniform distribution
     on {0,...,n-1}. We control the randomness by setting the seed to *seed*.
-    If *seed* = -1 we return all indices {0,1,2,...,n-1} for debugging.
+    If *seed* = -1 we return all indices {0,...,n-1} for debugging.
 
     Args:
         n (int): Upper bound for indices and number of indices to draw
         seed (int): Random number seed.
 
     Returns:
-        indices (np.array): Resample indices (resampled with replacement)
+        indices (np.array): Resample indices.
 
     """
     if seed == -1:
@@ -310,6 +316,86 @@ def _draw_resample_index(n, seed):
     np.random.seed(seed)
     indices = np.random.randint(0, n, n)
     return indices
+
+
+def _draw_feature_index(p, ratio, seed):
+    """Draw random vector of feature indices.
+
+    Draw np.ceil(p * ratio) many indices from {0,...,p-1} without replacement.
+    We control the randomness by setting the seed to *seed*. If *ratio* = -1 we
+    return all indices {0,...,p-1} for debugging.
+
+    Args:
+        p (int): Number of features.
+        ratio (float): Ratio of features to draw, in [0, 1].
+        seed (int): Random number seed.
+
+    Returns:
+        indices (np.array): Index vector of length p.
+
+    """
+    if ratio == -1:
+        return np.arange(p)
+    np.random.seed(seed)
+    nfeat = int(np.ceil(p * ratio))
+    indices = np.random.choice(p, nfeat, replace=False)
+    return indices
+
+
+def _construct_forest_df_from_trees(ctrees, features):
+    """Combine multiple Causal Tree df to single Causal Forest df.
+
+    Since the individual Causal Trees only see a subset of the complete
+    features, there indices for the feature splits is distorted. Here we adjust
+    the feature split indices so that the trees can be used with new data with
+    shape of the original data.
+
+    Args:
+        ctrees (list): List of Causal Trees stored as pd.DataFrame.
+        features (list): List of feature indices used for each Causal Tree.
+            That is, features[i] represent the indices with respect to the
+            complete feature vector, which were used in the fitting process of
+            Causal Tree ctrees[i].
+
+    Returns:
+        cforest (pd.DataFrame): A Causal Forest represented in a data frame.
+
+    """
+    causaltrees = deepcopy(ctrees)
+    for i, ct in enumerate(causaltrees):
+        ct.split_feat = _return_adjusted_feature_indices_ctree(
+            splits=ct.split_feat.values, subset_features=features[i]
+        )
+
+    num_trees = len(causaltrees)
+    cforest = pd.concat(
+        causaltrees, keys=range(num_trees), names=["tree_id", "node_id"]
+    )
+    return cforest
+
+
+def _return_adjusted_feature_indices_ctree(splits, subset_features):
+    """Construct split index vector with respect to all features.
+
+    Args:
+        splits (np.array): 1d array representing indices where the Causal Tree
+            was split.
+        subset_features (np.array): 1d array representing which features where
+            passed to the Causal Tree.
+
+    Returns:
+        adjusted_splits (pd.Series): Series representing indices where the
+            Causal Tree was split, but with respect to all features and not the
+            subset of features.
+
+    """
+    n = len(splits)
+    where_nan = np.isnan(splits)
+    adjusted_splits = np.repeat(np.nan, n)
+
+    non_nan_splits = np.array(splits[~where_nan], dtype="int")
+    adjusted_splits[~where_nan] = subset_features[non_nan_splits]
+    return pd.Series(adjusted_splits, dtype="Int64")
 
 
 def predict_causalforest(cforest, X):
