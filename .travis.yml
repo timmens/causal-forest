@@ -16,8 +16,7 @@ script:
   # - source .envrc
   #- travis_wait python utils/travis_runner.py
   #--cov-report term --cov=app/test/
-  - pytest --cov-report term --cov=causal-forest cforest/tests/
-  #- pytest -v
+  - pytest -v --doctest-modules --cov-report term --cov=causal-forest cforest/tests/
 
 after_success:
   - codecov
