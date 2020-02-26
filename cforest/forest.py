@@ -2,7 +2,7 @@
 Module to fit a causal forest.
 
 This module provides functions to fit a causal forest. Most importantly it
-provides the wrapper class `CausalForest`, which can be used to fit a causal
+provides the wrapper class ``CausalForest``, which can be used to fit a causal
 forest, load a fitted model from disc, save a fitted model to disc and predict
 treatment effects on new data.
 """
@@ -23,28 +23,31 @@ class CausalForest:
 
     Estimator class to fit a causal forest on numerical data given
     hyperparameters set in *forest_params* and *tree_params*.
-    Provides methods to `fit` the model, `predict` using the fitted model,
-    `save` the fitted model and `load` a fitted model.
+    Provides methods to ``fit`` the model, ``predict`` using the fitted model,
+    ``save`` the fitted model and ``load`` a fitted model.
 
     Note that the structure of this estimator is based on the BaseEstimator and
     RegressorMixin from sklearn; however, here we predict treatment effects
     --which are unobservable-- hence regular model validation and model
     selection techniques (e.g. cross validation grid search) do not work as
-    we can never estimate a loss on a training sample.
+    we can never estimate a loss on a training sample, thus a tighter
+    integration into the sklearn workflow is unlikely for now.
 
 
     Attributes:
         forestparams (dict):
             Hyperparameters for forest. Has to include 'num_trees' (int) and
-            'ratio_features_at_split' (in [0, 1]).
+            'ratio_features_at_split' (in [0, 1]). Example: forestparams = {
+            'num_trees': 100, 'ratio_features_at_split': 0.7}
 
         treeparams (dict):
             Parameters for tree. Has to include 'min_leaf' (int) and
-            'max_depth' (int).
+            'max_depth' (int). Example: treeparams = {'min_leaf': 5,
+            'max_depth': 25}
 
         _is_fitted (bool):
-            True if the `fit` method was called or a fitted model was loaded
-            using the `load` method and False otherwise.
+            True if the ``fit`` method was called or a fitted model was loaded
+            using the ``load`` method and False otherwise.
 
         num_features (int):
             Number of features in design matrix that was used to fit the model.
@@ -52,11 +55,11 @@ class CausalForest:
 
         fitted_model (pd.DataFrame):
             Data frame representing the fitted model, see function
-            `_assert_df_is_valid_cforest` for a detailed description of how a
-            data frame represents a causal forest model.
+            ``_assert_df_is_valid_cforest`` for how a Causal Forest model is
+            represented using data frames.
 
-        seed_counter (generator):
-            Seed generator object.
+        seed_counter (int):
+            Number where to start the seed counter.
 
     """
 
@@ -84,7 +87,7 @@ class CausalForest:
         if forestparams is None:
             self.forest_params = {
                 "num_trees": 100,
-                "ratio_features_at_split": 0.5,
+                "ratio_features_at_split": 0.7,
             }
         else:
             if not isinstance(forestparams, dict):
@@ -101,7 +104,7 @@ class CausalForest:
         if treeparams is None:
             self.treeparams = {
                 "min_leaf": 4,
-                "max_depth": 20,
+                "max_depth": 25,
             }
         else:
             if not isinstance(treeparams, dict):
@@ -116,37 +119,44 @@ class CausalForest:
             self.treeparams = treeparams
 
     def fit(self, X, t, y):
-        """Fits causal forest on supplied data.
+        """Fits Causal Forest on supplied data.
 
-        Fits a causal forest on outcomes *y* with treatment status *t* and
+        Fits a Causal Forest on outcomes *y* with treatment status *t* and
         features *X*, if data has no missing values and is of consistent shape.
 
         Args:
-            X: data on features
-            t: data on treatment status
-            y: data on outcomes
+            X (pd.DataFrame or np.ndarray):
+                Data on features
+
+            t (pd.Series or np.ndarray):
+                Data on treatment status
+
+            y (pd.Series or np.ndarray):
+                Data on outcomes
 
         Returns:
-            self: the fitted regressor.
+            self:
+                The fitted regressor.
 
         Raises:
-            - TypeError, if data is not a pd.DataFrame or np.array
-            - ValueError, if data has inconsistent shapes
+            - ``TypeError``, if data is not a pd.DataFrame or np.array
+            - ``ValueError``, if data has inconsistent shapes
 
         """
         _assert_data_input_cforest(X, t, y)
+        XX, tt, yy = np.array(X), np.array(t), np.array(y)
 
         fitted_model = fit_causalforest(
-            X=X,
-            t=t,
-            y=y,
+            X=XX,
+            t=tt,
+            y=yy,
             forestparams=self.forestparams,
             treeparams=self.treeparams,
             seed_counter=self.seed_counter,
         )
         self.fitted_model = fitted_model
         self._is_fitted = True
-        self.num_features = X.shape[1]
+        self.num_features = XX.shape[1]
 
         return self
 
@@ -157,11 +167,12 @@ class CausalForest:
         features *X*, if *X* is a np.array of pd.DataFrame of correct shape.
 
         Args:
-            X: data on new features
+            X (pd.DataFrame or np.array):
+                Data on new features
 
         Returns:
-            predictions (np.array): array containing one predictions per row
-                of *X*.
+            predictions (np.array):
+                Predictions per row of X.
 
         """
         if not self._is_fitted:
@@ -178,17 +189,20 @@ class CausalForest:
         if X.shape[1] != self.num_features:
             raise ValueError("Data on new features *X* has wrong dimensions.")
 
-        predictions = predict_causalforest(self.fitted_model, X)
+        XX = np.array(X)
+        predictions = predict_causalforest(self.fitted_model, XX)
         return predictions
 
     def save(self, filename, overwrite=True):
         """Save fitted model as a csv file.
 
         Args:
-            filename (str): complete directory path including filename where to
-                save the fitted model.
-            overwrite (bool): overwrite existing file if True and not
-                otherwise
+            filename (str):
+                Complete directory path including filename where to save the
+                fitted model.
+
+            overwrite (bool):
+                Overwrite existing file if True and otherwise do nothing.
 
         Returns:
             None
@@ -218,10 +232,12 @@ class CausalForest:
         """Load fitted model from disc.
 
         Args:
-            filename (str): complete directory path including filename where to
-                load the fitted model from.
-            overwrite_fitted_model (bool): overwrite self.fitted_model if True
-                and do nothing otherwise.
+            filename (str):
+                Complete directory path including filename where to load the
+                fitted model from.
+
+            overwrite_fitted_model (bool):
+                Overwrite self.fitted_model if True and do nothing otherwise.
 
         Returns:
             self: the fitted regressor.

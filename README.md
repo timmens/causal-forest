@@ -35,7 +35,7 @@ The documentation is hosted at https://causal-forest.readthedocs.io/en/latest/.
 ## Example
 
 ```python
-from cforest.forest import CausalForest()
+from cforest.forest import CausalForest
 
 X, t, y = simulate_treatment_data()
 XX = simulate_testing_features()
