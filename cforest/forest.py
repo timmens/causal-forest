@@ -46,7 +46,7 @@ class CausalForest:
             True if the `fit` method was called or a fitted model was loaded
             using the `load` method and False otherwise.
 
-        _num_features (int):
+        num_features (int):
             Number of features in design matrix that was used to fit the model.
             If forest has not been fitted is set to None.
 
@@ -77,7 +77,7 @@ class CausalForest:
                 (int) and 'max_depth' (int).
         """
         self._is_fitted = False
-        self._num_features = None
+        self.num_features = None
         self.fitted_model = None
         self.seed_counter = seed_counter
 
@@ -146,7 +146,7 @@ class CausalForest:
         )
         self.fitted_model = fitted_model
         self._is_fitted = True
-        self._num_features = X.shape[1]
+        self.num_features = X.shape[1]
 
         return self
 
@@ -175,7 +175,7 @@ class CausalForest:
             raise TypeError(
                 "Data on new features *X* is not a pd.DataFrame or np.array."
             )
-        if X.shape[1] != self._num_features:
+        if X.shape[1] != self.num_features:
             raise ValueError("Data on new features *X* has wrong dimensions.")
 
         predictions = predict_causalforest(self.fitted_model, X)
@@ -207,7 +207,11 @@ class CausalForest:
                 warnings.warn("File already exists.", UserWarning)
                 return None
 
-        self.fitted_model.to_csv(filename)
+        # rename split_feat column to store number of features
+        newname = "split_feat" + f"({self.num_features})"
+        out = self.fitted_model.rename(columns={"split_feat": newname})
+
+        out.to_csv(filename)
         return None
 
     def load(self, filename, overwrite_fitted_model=False):
@@ -236,14 +240,29 @@ class CausalForest:
             candidate_model = candidate_model.set_index(["tree_id", "node_id"])
         except KeyError:
             raise KeyError(
-                "The file to load needs to have its first two"
-                "columns to be 'tree_id' and 'node_id'"
+                "The file to load needs to have the columns 'tree_id' and "
+                "'node_id'"
+            )
+        try:
+            columns = candidate_model.columns.tolist()
+            splitcolumn = [
+                col for col in columns if col.startswith("split_feat")
+            ][0]
+            num_features = int(splitcolumn.split("split_feat")[1].strip("()"))
+            candidate_model = candidate_model.rename(
+                columns={splitcolumn: "split_feat"}
+            )
+        except IndexError:
+            raise ValueError(
+                "The file to load needs to have the number of features stored"
+                "as the column name for 'split_feat', i.e. 'split_feat(k)'."
             )
         _assert_df_is_valid_cforest(candidate_model)
 
         fitted_model = _update_dtypes(candidate_model)
         self.fitted_model = fitted_model
         self._is_fitted = True
+        self.num_features = num_features
         return self
 
 
