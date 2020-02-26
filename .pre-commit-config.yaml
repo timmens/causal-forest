@@ -32,7 +32,7 @@ repos:
             flake8-eradicate, flake8-print, flake8-rst-docstrings, flake8-todo,
             pep8-naming, pydocstyle==3.0.0,
         ]
-        args: [--ignore=E203 N803 F841 E231 RST301 RST203 RST201, --exclude=__init__.py conf.py setup.py cforest/tests/*]
+        args: [--ignore=E203 N803 N806 F841 E231 RST301 RST203 RST201, --exclude=__init__.py conf.py setup.py cforest/tests/*]
 -   repo: https://github.com/PyCQA/doc8
     rev: 0.8.1rc2
     hooks:

@@ -19,17 +19,18 @@ def fit_causaltree(X, t, y, critparams=None):
     fitted tree as a pd.DataFrame.
 
     Args:
-        X (np.array): data on features
-        t (np.array): data on treatment status
-        y (np.array): data on outcomes
-        critparams (dict): dictionary containing information on when to stop
+        X (np.array): Data on features
+        t (np.array): Data on treatment status
+        y (np.array): Data on outcomes
+        critparams (dict): Dictionary containing information on when to stop
             splitting further, i.e., minimum number of leafs and maximum
             depth of the tree. Default is set to 'min_leaf' = 4 and
             'max_depth' = 20.
 
     Returns:
         ctree (pd.DataFrame): the fitted causal tree represented as a pandas
-            data frame.
+            data frame. If honest is true ctree is an honest causal tree and
+            a regular otherwise.
 
     """
     if critparams is None:
@@ -69,11 +70,11 @@ def fit_causaltree(X, t, y, critparams=None):
         "split_feat",
     ]
 
-    ctree = pd.DataFrame(ctree_array, columns=column_names)
-    ctree[columns_to_int] = ctree[columns_to_int].astype("Int64")
+    ct = pd.DataFrame(ctree_array, columns=column_names)
+    ct[columns_to_int] = ct[columns_to_int].astype("Int64")
+    ct = ct.set_index("id").sort_index()
 
-    ctree = ctree.set_index("id").sort_index()
-    return ctree
+    return ct
 
 
 def _fit_node(X, t, y, index, critparams, idparams):
@@ -337,18 +338,27 @@ def _compute_global_loss(
     using the dynamically updated sums and number of observations.
 
     Args:
-        sum_1l:
-        n_1l:
-        sum_0l:
-        n_0l:
-        sum_1r:
-        n_1r:
-        sum_0r:
-        n_0r:
-        y_transformed:
+        sum_1l (float): Sum of outcomes of treated observations left to the
+            potential split at index *i*.
+        n_1l (int): Number of treated observations left to the potential split
+            at index *i*.
+        sum_0l (float): Sum of outcomes of untreated observations left to the
+            potential split at index *i*.
+        n_0l (int): Number of untreated observations left to the potential
+            split at index *i*.
+        sum_1r (float): Sum of outcomes of treated observations right to the
+            potential split at index *i*.
+        n_1r (int): Number of treated observations right to the potential split
+            at index *i*.
+        sum_0r (float): Sum of outcomes of untreated observations right to the
+            potential split at index *i*.
+        n_0r (int): Number of untreated observations right to the potential
+            split at index *i*.
+        y_transformed (np.array): Transformed outcomes.
+        i (int): Index at which to split.
 
     Returns:
-        global_loss (float): the occured loss.
+        global_loss (float): The loss when splitting at index *i*.
 
     """
     left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
@@ -423,7 +433,7 @@ def _transform_outcome(y, t):
     """Transform outcome.
 
     Transforms outcome using approximate propensity scores. Equation is as
-    follows: tilde{y}_i = 2 * y_i * t_i - 2 * y_i * (1 - t_i), where t_i
+    follows: y_transformed_i = 2 * y_i * t_i - 2 * y_i * (1 - t_i), where t_i
     denotes the treatment status of the ith individual. This object is
     equivalent to the individual treatment effect in expectation.
 
@@ -544,6 +554,12 @@ def _compute_treatment_effect_raw(
 
     Returns:
         out (float): the estimated treatment effect
+
+    Example:
+    >>> sum_t, n_t = 10, 100
+    >>> sum_unt, n_unt = 20, 1000
+    >>> _compute_treatment_effect_raw(sum_t, n_t, sum_unt, n_unt)
+    -40
 
     """
     out = sum_treated / n_treated - sum_untreated / n_untreated
