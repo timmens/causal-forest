@@ -3,13 +3,14 @@ import pandas as pd
 import pytest
 from numpy.testing import assert_array_equal
 
+from cforest.tree import _compute_global_loss
 from cforest.tree import _compute_valid_splitting_indices
-from cforest.tree import _find_optimal_split_observation_loop
+from cforest.tree import _find_optimal_split
+from cforest.tree import _find_optimal_split_inner_loop
 from cforest.tree import _predict_row_causaltree
 from cforest.tree import _retrieve_index
 from cforest.tree import _transform_outcome
 from cforest.tree import predict_causaltree
-
 
 tt = [
     np.array([False]),
@@ -112,20 +113,46 @@ def test__retrieve_index_reverse_engineer_index_sorted():
     pass
 
 
-def test__find_optimal_split_observation_loop():
-    # Simulate data for which we know that the split must occur at x = 0
-    numsim = 10000
-    x = np.linspace(-1, 1, num=numsim + 1)
+def test__compute_global_loss():
+    n_1l, n_0l, n_1r, n_0r = 10, 10, 10, 10
+    sum_1l, sum_0l, sum_1r, sum_0r = 10, 10, 10, 10
+    y_transformed = np.array(20 * [-2, 2])
+    i = 20
+
+    result = _compute_global_loss(
+        sum_1l=sum_1l,
+        sum_0l=sum_0l,
+        sum_1r=sum_1r,
+        sum_0r=sum_0r,
+        n_1l=n_1l,
+        n_0l=n_0l,
+        n_1r=n_1r,
+        n_0r=n_0r,
+        y_transformed=y_transformed,
+        i=i,
+    )
+    assert result == 160.0
+
+
+def _create_data_for_splitting_tests(n):
+    x = np.linspace(-1, 1, num=n)
     np.random.seed(2)
-    t = np.array(np.random.binomial(1, 0.5, numsim + 1), dtype=bool)
-    y = np.repeat([-1, 1], int(numsim / 2))
-    y = np.insert(y, int(numsim / 2), -1)
+    t = np.array(np.random.binomial(1, 0.5, n), dtype=bool)
+    y = np.repeat([-1, 1], int(n / 2))
+    y = np.insert(y, int(n / 2), -1)
     y = y + 2 * y * t
+    return x, t, y
+
+
+def test__find_optimal_split_inner_loop():
+    """Create 1 dim. data for which we know that the split must occur at x = 0.
+    """
+    nobs = 10001
+    x, t, y = _create_data_for_splitting_tests(n=nobs)
     y_transformed = _transform_outcome(y, t)
     splitting_indices = _compute_valid_splitting_indices(t, min_leaf=2)
-    loss = np.inf
 
-    result = _find_optimal_split_observation_loop(
+    result = _find_optimal_split_inner_loop(
         splitting_indices=splitting_indices,
         x=x,
         t=t,
@@ -133,13 +160,29 @@ def test__find_optimal_split_observation_loop():
         y_transformed=y_transformed,
         min_leaf=4,
     )
-
     _, split_value, split_index = result
 
     # need to check if the algorithms needs to hit 0.0 for sure or only approx.
     assert abs(split_value) < 0.02
-    # as above (check if we find an index close to the middle)
-    assert abs(split_index - numsim / 2) < 15
+    # as above (check if we found an index very close to the middle)
+    assert abs(split_index - nobs / 2) < 15
+
+
+def test__find_optimal_split():
+    """Create multi dimensional data for which we know that the split must
+    occur almost surely at the first feature."""
+    nobs = 10001  # number of observations
+    k = 10  # number of unrelated features
+    x, t, y = _create_data_for_splitting_tests(n=nobs)
+
+    # no seed on purpose
+    unrelated_features = np.random.normal(loc=0, scale=2, size=(nobs, k))
+    X = np.hstack((x.reshape((-1, 1)), unrelated_features))
+    index = np.full((nobs,), True)
+
+    tmp = _find_optimal_split(X=X, t=t, y=y, index=index, min_leaf=4)
+    _, _, split_feat, _ = tmp
+    assert split_feat == 0
 
 
 ctree = pd.read_csv("cforest/tests/data/fitted_ctree__predict_row_test.csv")

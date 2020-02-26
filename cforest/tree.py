@@ -62,13 +62,7 @@ def fit_causaltree(X, t, y, critparams=None):
         "split_value",
         "treat_effect",
     ]
-    columns_to_int = [
-        "id",
-        "left_child",
-        "right_child",
-        "level",
-        "split_feat",
-    ]
+    columns_to_int = column_names[:5]
 
     ct = pd.DataFrame(ctree_array, columns=column_names)
     ct[columns_to_int] = ct[columns_to_int].astype("Int64")
@@ -206,7 +200,7 @@ def _find_optimal_split(X, t, y, index, min_leaf):
         )
 
         # loop through observations
-        tmp = _find_optimal_split_observation_loop(
+        tmp = _find_optimal_split_inner_loop(
             splitting_indices=splitting_indices,
             x=xx,
             t=tt,
@@ -234,7 +228,7 @@ def _find_optimal_split(X, t, y, index, min_leaf):
     return left, right, split_feat, split_value
 
 
-def _find_optimal_split_observation_loop(
+def _find_optimal_split_inner_loop(
     splitting_indices, x, t, y, y_transformed, min_leaf
 ):
     """Find the optimal splitting value for data on a single feature.
@@ -449,7 +443,7 @@ def _transform_outcome(y, t):
     >>> y = np.array([-1, 0, 1])
     >>> t = np.array([True, True, False])
     >>> _transform_outcome(y, t)
-    array([-2, 0, -2])
+    array([-2,  0, -2])
 
     """
     y_transformed = 2 * y * t - 2 * y * (1 - t)
@@ -474,7 +468,7 @@ def _estimate_treatment_effect(y, t):
     >>> y = np.array([-1, 0, 1, 2, 3, 4])
     >>> t = np.array([False, False, False, True, True, True])
     >>> _estimate_treatment_effect(y, t)
-    3
+    3.0
 
     """
     out = y[t].mean() - y[~t].mean()
@@ -506,12 +500,14 @@ def _retrieve_index(index, sorted_subset_index, split_index):
 
     Example:
     >>> import numpy as np
+    >>> from pprint import PrettyPrinter
     >>> index = np.array([True, True, True, False, False, True])
     >>> sorted_subset_index = np.array([0, 3, 1, 2])
     >>> split_index = 1
-    >>> _retrieve_index(index, sorted_subset_index, split_index)
+    >>> PrettyPrinter().pprint(_retrieve_index(index, sorted_subset_index,
+    ... split_index))
     (array([ True, False, False, False, False,  True]),
-    array([False,  True,  True, False, False, False]))
+     array([False,  True,  True, False, False, False]))
 
     """
     # Not solving the bug:
@@ -556,10 +552,10 @@ def _compute_treatment_effect_raw(
         out (float): the estimated treatment effect
 
     Example:
-    >>> sum_t, n_t = 10, 100
-    >>> sum_unt, n_unt = 20, 1000
+    >>> sum_t, n_t = 100, 10.0
+    >>> sum_unt, n_unt = 1000, 20.0
     >>> _compute_treatment_effect_raw(sum_t, n_t, sum_unt, n_unt)
-    -40
+    -40.0
 
     """
     out = sum_treated / n_treated - sum_untreated / n_untreated
