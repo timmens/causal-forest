@@ -228,6 +228,7 @@ def _find_optimal_split(X, t, y, index, min_leaf):
     return left, right, split_feat, split_value
 
 
+@njit
 def _find_optimal_split_inner_loop(
     splitting_indices, x, t, y, y_transformed, min_leaf
 ):
@@ -323,6 +324,7 @@ def _find_optimal_split_inner_loop(
     return minimal_loss, split_value, split_index
 
 
+@njit
 def _compute_global_loss(
     sum_1l, n_1l, sum_0l, n_0l, sum_1r, n_1r, sum_0r, n_0r, y_transformed, i
 ):
@@ -365,6 +367,7 @@ def _compute_global_loss(
     return global_loss
 
 
+@njit
 def _compute_valid_splitting_indices(t, min_leaf):
     """Compute valid split indices for treatment array *t* given *min_leaf*.
 
@@ -403,18 +406,20 @@ def _compute_valid_splitting_indices(t, min_leaf):
 
     # first split at which both treated and untreated occure more often than
     # *min_leaf* is given by the maximum.
-    left = np.max([left_index_treated, left_index_untreated])
+    tmparray = np.array([left_index_treated, left_index_untreated])
+    left = np.max(tmparray)
 
     # do the same for right side
-    right_index_treated = np.argmax(np.cumsum(np.flip(t)) == min_leaf)
+    right_index_treated = np.argmax(np.cumsum(t[::-1]) == min_leaf)
     if right_index_treated == 0:
         return out
 
-    right_index_untreated = np.argmax(np.cumsum(np.flip(~t)) == min_leaf)
+    right_index_untreated = np.argmax(np.cumsum(~t[::-1]) == min_leaf)
     if right_index_untreated == 0:
         return out
 
-    right = n - np.max([right_index_treated, right_index_untreated])
+    tmparray = np.array([right_index_treated, right_index_untreated])
+    right = n - np.max(tmparray)
 
     if left > right - 1:
         return out
@@ -423,6 +428,7 @@ def _compute_valid_splitting_indices(t, min_leaf):
         return out
 
 
+@njit
 def _transform_outcome(y, t):
     """Transform outcome.
 
@@ -450,6 +456,7 @@ def _transform_outcome(y, t):
     return y_transformed
 
 
+@njit
 def _estimate_treatment_effect(y, t):
     """Estimate the average treatment effect.
 
