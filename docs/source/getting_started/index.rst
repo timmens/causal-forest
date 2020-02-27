@@ -8,3 +8,4 @@ Getting Started
 
    introduction
    installation
+   example.ipynb

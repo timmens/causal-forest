@@ -7,11 +7,12 @@ channels:
 dependencies:
   - python=3.7
   - cforest
+  - pip
   - pip:
-    - sphinx=2.2.1
-    - sphinx_rtd_theme=0.4.3
-    - nbsphinx=0.4.3
-    - jupyter=1.0.0
+    - sphinx==2.2.1
+    - sphinx_rtd_theme==0.4.3
+    - nbsphinx==0.4.3
+    - jupyter==1.0.0
     - numpy
     - pandas
-    - sklearn
+    - matplotlib

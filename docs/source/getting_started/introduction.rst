@@ -15,6 +15,11 @@ Further,
 they provide an `R` package (https://github.com/grf-labs/grf) which can be
 used to compute everything CForest computes and much more.
 
+Example
+=======
+
+A complete working example can be found in section ``example``.
+
 
 Warnings
 ========
