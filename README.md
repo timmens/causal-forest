@@ -15,7 +15,9 @@ With version 0.1.0 we will benchmark our code against existing code.
 
 ## Introduction
 
-Implements the Causal Forest algorithm published by Athey and Wager (2018).
+The ``cforest`` package can be used to estimate heterogeneous treatment effects
+in a [Neyman-Rubin potential outcome framework](https://en.wikipedia.org/wiki/Rubin_causal_model).
+It implements the Causal Forest algorithm first formulated in Athey and Wager (2018).
 
 
 ## Install
