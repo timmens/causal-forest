@@ -34,16 +34,28 @@ The documentation is hosted at https://causal-forest.readthedocs.io/en/latest/.
 
 ## Example
 
+### Complete example:
+
+For a complete working example going through all main features please view our example notebook.
+<a href="https://nbviewer.jupyter.org/github/timmens/causal-forest/blob/master/docs/source/getting_started/example.ipynb"
+   target="_parent">
+   <img align="center" 
+  src="https://raw.githubusercontent.com/jupyter/design/master/logos/Badges/nbviewer_badge.png" 
+      width="109" height="20">
+</a>
+
+### Minimal example:
+
 ```python
 from cforest.forest import CausalForest
 
-X, t, y = simulate_treatment_data()
-XX = simulate_testing_features()
+X, t, y = simulate_data()
 
 cf = CausalForest()
 
 cf = cf.fit(X, t, y)
 
+XX = simulate_new_features()
 predictions = cf.predict(XX)
 ```
 
