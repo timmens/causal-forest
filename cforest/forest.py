@@ -399,7 +399,7 @@ def _construct_forest_df_from_trees(ctrees, features):
     causaltrees = deepcopy(ctrees)
     for i, ct in enumerate(causaltrees):
         ct.split_feat = _return_adjusted_feature_indices_ctree(
-            splits=ct.split_feat.values, subset_features=features[i]
+            splits=ct.split_feat, subset_features=features[i]
         )
 
     num_trees = len(causaltrees)
@@ -413,7 +413,7 @@ def _return_adjusted_feature_indices_ctree(splits, subset_features):
     """Construct split index vector with respect to all features.
 
     Args:
-        splits (np.array): 1d array representing indices where the Causal Tree
+        splits (pd.Series): 1d array representing indices where the Causal Tree
             was split.
         subset_features (np.array): 1d array representing which features where
             passed to the Causal Tree.
@@ -425,10 +425,10 @@ def _return_adjusted_feature_indices_ctree(splits, subset_features):
 
     """
     n = len(splits)
-    where_nan = np.isnan(splits)
+    where_nan = splits.isna().values
     adjusted_splits = np.repeat(np.nan, n)
 
-    non_nan_splits = np.array(splits[~where_nan], dtype="int")
+    non_nan_splits = splits.dropna().to_numpy(dtype="int")
     adjusted_splits[~where_nan] = subset_features[non_nan_splits]
     return pd.Series(adjusted_splits, dtype="Int64")
 
