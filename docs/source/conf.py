@@ -34,6 +34,7 @@ master_doc = "index"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx_rtd_theme",
+    "nbsphinx",
 ]
 
 autodoc_mock_imports = [
