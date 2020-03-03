@@ -130,21 +130,21 @@ class CausalForest:
 
         Args:
             X (pd.DataFrame or np.ndarray):
-                Data on features
+                Data on features.
 
             t (pd.Series or np.ndarray):
-                Data on treatment status
+                Data on treatment status.
 
             y (pd.Series or np.ndarray):
-                Data on outcomes
+                Data on outcomes.
 
         Returns:
             self:
                 The fitted regressor.
 
         Raises:
-            - ``TypeError``, if data is not a pd.DataFrame or np.array
-            - ``ValueError``, if data has inconsistent shapes
+            - ``TypeError``, if data is not a pd.DataFrame or np.array.
+            - ``ValueError``, if data has inconsistent shapes.
 
         """
         _assert_data_input_cforest(X, t, y)
@@ -164,7 +164,7 @@ class CausalForest:
 
         return self
 
-    def predict(self, X):
+    def predict(self, X, num_workers=1):
         """Predicts treatment effects for new features *X*.
 
         If the regressor has been fitted, predicts treatment effects of new
@@ -172,7 +172,10 @@ class CausalForest:
 
         Args:
             X (pd.DataFrame or np.array):
-                Data on new features
+                Data on new features.
+
+        num_workers (int):
+            Number of workers for parallelization. Defaults to 1.
 
         Returns:
             predictions (np.array):
@@ -194,7 +197,9 @@ class CausalForest:
             raise ValueError("Data on new features *X* has wrong dimensions.")
 
         XX = np.array(X)
-        predictions = predict_causalforest(self.fitted_model, XX)
+        predictions = predict_causalforest(
+            self.fitted_model, XX, num_workers=num_workers
+        )
         return predictions
 
     def save(self, filename, overwrite=True):
@@ -485,28 +490,33 @@ def _return_adjusted_feature_indices_ctree(splits, subset_features):
     return pd.Series(adjusted_splits, dtype="Int64")
 
 
-def predict_causalforest(cforest, X):
+def predict_causalforest(cforest, X, num_workers):
     """Predicts individual treatment effects for a causal forest.
 
     Predicts individual treatment effects for new observed features *X*
-    on a fitted causal forest *cforest*.
+    on a fitted causal forest *cforest*. Predictions are made in parallel with
+    *num_workers* processes.
 
     Args:
         cforest (pd.DataFrame): fitted causal forest represented in a multi-
             index pd.DataFrame consisting of several fitted causal trees
         X (np.array): 2d array of new observations for which we predict the
             individual treatment effect.
+        num_workers (int): Number of workers for parallelization.
 
     Returns:
         predictions (np.array): 1d array of treatment predictions.
 
     """
     num_trees = len(cforest.groupby(level=0))
-    n, p = X.shape
+    n, _ = X.shape
 
-    predictions = np.empty((num_trees, n))
-    for i in range(num_trees):
-        predictions[i, :] = predict_causaltree(cforest.loc[i], X)
+    predictions = Parallel(n_jobs=num_workers)(
+        delayed(predict_causaltree)(cforest.loc[i], X)
+        for i in range(num_trees)
+    )
+    predictions = [arr.reshape((1, n)) for arr in predictions]
+    predictions = np.concatenate(predictions, axis=0)
 
     predictions = predictions.mean(axis=0)
     return predictions
