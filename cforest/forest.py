@@ -6,7 +6,7 @@ provides the wrapper class ``CausalForest``, which can be used to fit a causal
 forest, load a fitted model from disc, save a fitted model to disc and predict
 treatment effects on new data.
 """
-import glob
+import pathlib
 import warnings
 from copy import deepcopy
 from itertools import count
@@ -216,8 +216,8 @@ class CausalForest:
             )
 
         if not overwrite:
-            file_exists = glob.glob(filename)
-            if file_exists:
+            file = pathlib.Path(filename)
+            if file.exists():
                 warnings.warn("File already exists.", UserWarning)
                 return None
 
