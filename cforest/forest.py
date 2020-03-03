@@ -9,10 +9,11 @@ treatment effects on new data.
 import pathlib
 import warnings
 from copy import deepcopy
-from itertools import count
 
 import numpy as np
 import pandas as pd
+from joblib import delayed
+from joblib import Parallel
 
 from cforest.tree import fit_causaltree
 from cforest.tree import predict_causaltree
@@ -37,8 +38,9 @@ class CausalForest:
     Attributes:
         forestparams (dict):
             Hyperparameters for forest. Has to include 'num_trees' (int) and
-            'ratio_features_at_split' (in [0, 1]). Example: forestparams = {
-            'num_trees': 100, 'ratio_features_at_split': 0.7}
+            'ratio_features_at_split' (in [0, 1]) and 'num_workers'. Example:
+            forestparams = {'num_trees': 100, 'ratio_features_at_split': 0.7,
+            'num_workers': 4}
 
         treeparams (dict):
             Parameters for tree. Has to include 'min_leaf' (int) and
@@ -93,7 +95,9 @@ class CausalForest:
             if not isinstance(forestparams, dict):
                 raise TypeError("Argument *forestparams* is not a dictionary.")
 
-            if {"num_trees", "ratio_features_at_split"} != set(forestparams):
+            if {"num_trees", "ratio_features_at_split", "num_workers"} != set(
+                forestparams
+            ):
                 raise ValueError(
                     "Argument *forstparams* does not contain the correct "
                     "parameter 'num_trees' and 'ratio_features_at_split'."
@@ -287,7 +291,9 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
 
     Fits a causal forest using data on outcomes *y*, treatment status *t*
     and features *X*. Forest will be made up of *num_trees* causal trees with
-    parameters *crit_params_ctree*.
+    parameters *crit_params_ctree*. Trees will be fit in parallel if argument
+    *num_workers* in dictionary *forestparams* is set to an integer greater
+    than 1.
 
     Args:
         X (np.array): 2d array containing numerical features
@@ -307,28 +313,74 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
     except ValueError:
         n, p = len(X), 1
 
-    counter = count(seed_counter)
     num_trees = forestparams["num_trees"]
     ratio_features_at_split = forestparams["ratio_features_at_split"]
+    num_workers = forestparams["num_workers"]
+    seed_sequence = range(seed_counter, seed_counter + num_trees)
 
-    ctrees = []
-    features = []
-    for _i in range(num_trees):
-        seed = next(counter)
-        resample_index = _draw_resample_index(n, seed)
-        feature_index = _draw_feature_index(p, ratio_features_at_split, seed)
-
-        ctree = fit_causaltree(
-            X=X[resample_index][:, feature_index],
-            t=t[resample_index],
-            y=y[resample_index],
-            critparams=treeparams,
+    parallel_result = Parallel(n_jobs=num_workers)(
+        delayed(_fit_single_tree_for_forest)(
+            i=i,
+            X=X,
+            t=t,
+            y=y,
+            treeparams=treeparams,
+            n=n,
+            p=p,
+            seed_sequence=seed_sequence,
+            ratio_features_at_split=ratio_features_at_split,
         )
-        ctrees.append(ctree)
-        features.append(feature_index)
+        for i in range(num_trees)
+    )
+    ctrees = [tmp[0] for tmp in parallel_result]
+    features = [tmp[1] for tmp in parallel_result]
 
     cforest = _construct_forest_df_from_trees(ctrees, features)
     return cforest
+
+
+def _fit_single_tree_for_forest(
+    i, X, t, y, treeparams, n, p, seed_sequence, ratio_features_at_split
+):
+    """Wrap ``fit_causaltree`` function to fit a (random) causal tree.
+
+    Fit a causal tree on a resampled observation index and on a subset of
+    randomly drawn features with ratio equal to *ratio_features_at_split*.
+
+    Args:
+        i (int): Loop index. Used to draw the seed from argument
+            *seed_sequence*.
+        X (np.array): 2d array containing numerical features
+        t (np.array): 1d (boolean) array containing treatment status
+        y (np.array): 1d array containing outcomes
+        treeparams (dict): Dictionary containing parameters for tree
+        n (int): Number of observations (n, _ = X.shape).
+        p (int): Number of features (_, p = X.shape).
+        seed_sequence (list): List of seeds which are used for the random
+            sampling.
+        ratio_features_at_split (float): Ratio of features to (randomly)
+            consider at each split for each tree.
+
+    Returns:
+        out (list): List containing fitted causal tree and feature index used
+            in the fitting process. (We return the feature index, as for a
+            single causal tree the first index might not be the same as for
+            the causal forest level.)
+
+    """
+    resample_index = _draw_resample_index(n, seed_sequence[i])
+    feature_index = _draw_feature_index(
+        p, ratio_features_at_split, seed_sequence[i]
+    )
+
+    ctree = fit_causaltree(
+        X=X[resample_index][:, feature_index],
+        t=t[resample_index],
+        y=y[resample_index],
+        critparams=treeparams,
+    )
+    out = [ctree, feature_index]
+    return out
 
 
 def _draw_resample_index(n, seed):
