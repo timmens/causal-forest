@@ -37,15 +37,21 @@ class CausalForest:
 
     Attributes:
         forestparams (dict):
-            Hyperparameters for forest. Has to include 'num_trees' (int) and
-            'ratio_features_at_split' (in [0, 1]) and 'num_workers'. Example:
-            forestparams = {'num_trees': 100, 'ratio_features_at_split': 0.7,
-            'num_workers': 4}
+            Hyperparameters for forest. Includes 'num_trees' (int) and
+            'split_ratio' (in [0, 1]) and 'num_workers'. Example:
+            forestparams = {
+                'num_trees': 100,
+                'split_ratio': 0.7,
+                'num_workers': 4
+            }
 
         treeparams (dict):
-            Parameters for tree. Has to include 'min_leaf' (int) and
-            'max_depth' (int). Example: treeparams = {'min_leaf': 5,
-            'max_depth': 25}
+            Parameters for tree. Includes 'min_leaf' (int) and
+            'max_depth' (int). Example:
+            treeparams = {
+                'min_leaf': 5,
+                'max_depth': 25
+            }
 
         _is_fitted (bool):
             True if the ``fit`` method was called or a fitted model was loaded
@@ -65,7 +71,15 @@ class CausalForest:
 
     """
 
-    def __init__(self, forestparams=None, treeparams=None, seed_counter=1):
+    def __init__(
+        self,
+        num_trees,
+        split_ratio,
+        min_leaf,
+        max_depth,
+        num_workers=1,
+        seed_counter=1,
+    ):
         """Initiliazes CausalForest estimator with hyperparameters.
 
         Initializes CausalForest estimator with hyperparameters for the forest,
@@ -76,51 +90,49 @@ class CausalForest:
         a leaf node and the maximum depth of a tree.
 
         Args:
-            forestparams (dict): Hyperparameters for forest. Has to include
-                'num_trees' (int) and 'ratio_features_at_split' (in [0, 1]).
-            treeparams (dict): Parameters for tree. Has to include 'min_leaf'
-                (int) and 'max_depth' (int).
+            num_trees (int):
+                Number of (causal) trees to use in the forest.
+
+            split_ratio (float):
+                Ratio of features to (randomly) consider for each tree. Has to
+                be in the range [0, 1].
+
+            min_leaf (int):
+                Minimum number of observations of each type (treated,
+                untreated) allowed in a leaf.
+
+            max_depth (int):
+                Maximum depth a single tree is allowed to grow.
+
+            num_workers (int):
+                Number of workers for parallelization.
+
+            seed_counter (int):
+                Number where to start the seed counter.
+
         """
+        _check_init_inputs_causal_forest(
+            num_trees,
+            split_ratio,
+            min_leaf,
+            max_depth,
+            num_workers,
+            seed_counter,
+        )
+
+        self.forestparams = {
+            "num_trees": num_trees,
+            "split_ratio": split_ratio,
+        }
+        self.treeparams = {
+            "min_leaf": min_leaf,
+            "max_depth": max_depth,
+        }
+        self.seed_counter = seed_counter
+        self.num_workers = num_workers
         self._is_fitted = False
         self.num_features = None
         self.fitted_model = None
-        self.seed_counter = seed_counter
-
-        if forestparams is None:
-            self.forest_params = {
-                "num_trees": 100,
-                "ratio_features_at_split": 0.7,
-            }
-        else:
-            if not isinstance(forestparams, dict):
-                raise TypeError("Argument *forestparams* is not a dictionary.")
-
-            if {"num_trees", "ratio_features_at_split", "num_workers"} != set(
-                forestparams
-            ):
-                raise ValueError(
-                    "Argument *forstparams* does not contain the correct "
-                    "parameter 'num_trees' and 'ratio_features_at_split'."
-                )
-
-            self.forestparams = forestparams
-
-        if treeparams is None:
-            self.treeparams = {
-                "min_leaf": 4,
-                "max_depth": 25,
-            }
-        else:
-            if not isinstance(treeparams, dict):
-                raise TypeError("Argument *treeparams* is not a dictionary.")
-
-            if {"min_leaf", "max_depth"} != set(treeparams):
-                raise ValueError(
-                    "Argument *treeparams* does not contain the correct "
-                    "parameter 'min_leaf' and 'max_depth'."
-                )
-
-            self.treeparams = treeparams
 
     def fit(self, X, t, y):
         """Fits Causal Forest on supplied data.
@@ -156,6 +168,7 @@ class CausalForest:
             y=yy,
             forestparams=self.forestparams,
             treeparams=self.treeparams,
+            num_workers=self.num_workers,
             seed_counter=self.seed_counter,
         )
         self.fitted_model = fitted_model
@@ -164,7 +177,7 @@ class CausalForest:
 
         return self
 
-    def predict(self, X, num_workers=1):
+    def predict(self, X, num_workers=None):
         """Predicts treatment effects for new features *X*.
 
         If the regressor has been fitted, predicts treatment effects of new
@@ -174,8 +187,9 @@ class CausalForest:
             X (pd.DataFrame or np.array):
                 Data on new features.
 
-        num_workers (int):
-            Number of workers for parallelization. Defaults to 1.
+            num_workers (int):
+                Number of workers for parallelization. Defaults to the number
+                passed to the init method.
 
         Returns:
             predictions (np.array):
@@ -195,8 +209,16 @@ class CausalForest:
             )
         if X.shape[1] != self.num_features:
             raise ValueError("Data on new features *X* has wrong dimensions.")
-
         XX = np.array(X)
+
+        if num_workers is not None:
+            if not isinstance(num_workers, int) or num_workers <= 0:
+                raise ValueError(
+                    "Argument *num_workers* needs to be a positive" "integer."
+                )
+        else:
+            num_workers = self.num_workers
+
         predictions = predict_causalforest(
             self.fitted_model, XX, num_workers=num_workers
         )
@@ -291,7 +313,9 @@ class CausalForest:
         return self
 
 
-def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
+def fit_causalforest(
+    X, t, y, forestparams, treeparams, num_workers, seed_counter
+):
     """Fits a causal forest on given data.
 
     Fits a causal forest using data on outcomes *y*, treatment status *t*
@@ -301,15 +325,16 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
     than 1.
 
     Args:
-        X (np.array): 2d array containing numerical features
-        t (np.array): 1d (boolean) array containing treatment status
-        y (np.array): 1d array containing outcomes
-        forestparams (dict): dictionary containing hyperparameters for forest
-        treeparams (dict): dictionary containing parameters for tree
-        seed_counter (int): number where to start the seed counter
+        X (np.array): 2d array containing numerical features.
+        t (np.array): 1d (boolean) array containing treatment status.
+        y (np.array): 1d array containing outcomes.
+        forestparams (dict): Dictionary containing hyperparameters for forest.
+        treeparams (dict): Dictionary containing parameters for tree.
+        num_workers (int): Number of workers for parallelization.
+        seed_counter (int): Number where to start the seed counter.
 
     Returns:
-        cforest (pd.DataFrame): fitted causal forest represented in a pandas
+        cforest (pd.DataFrame): Fitted causal forest represented in a pandas
             data frame.
 
     """
@@ -319,8 +344,7 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
         n, p = len(X), 1
 
     num_trees = forestparams["num_trees"]
-    ratio_features_at_split = forestparams["ratio_features_at_split"]
-    num_workers = forestparams["num_workers"]
+    split_ratio = forestparams["split_ratio"]
     seed_sequence = range(seed_counter, seed_counter + num_trees)
 
     parallel_result = Parallel(n_jobs=num_workers)(
@@ -333,7 +357,7 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
             n=n,
             p=p,
             seed_sequence=seed_sequence,
-            ratio_features_at_split=ratio_features_at_split,
+            split_ratio=split_ratio,
         )
         for i in range(num_trees)
     )
@@ -345,12 +369,12 @@ def fit_causalforest(X, t, y, forestparams, treeparams, seed_counter):
 
 
 def _fit_single_tree_for_forest(
-    i, X, t, y, treeparams, n, p, seed_sequence, ratio_features_at_split
+    i, X, t, y, treeparams, n, p, seed_sequence, split_ratio
 ):
     """Wrap ``fit_causaltree`` function to fit a (random) causal tree.
 
     Fit a causal tree on a resampled observation index and on a subset of
-    randomly drawn features with ratio equal to *ratio_features_at_split*.
+    randomly drawn features with ratio equal to *split_ratio*.
 
     Args:
         i (int): Loop index. Used to draw the seed from argument
@@ -363,7 +387,7 @@ def _fit_single_tree_for_forest(
         p (int): Number of features (_, p = X.shape).
         seed_sequence (list): List of seeds which are used for the random
             sampling.
-        ratio_features_at_split (float): Ratio of features to (randomly)
+        split_ratio (float): Ratio of features to (randomly)
             consider at each split for each tree.
 
     Returns:
@@ -374,9 +398,7 @@ def _fit_single_tree_for_forest(
 
     """
     resample_index = _draw_resample_index(n, seed_sequence[i])
-    feature_index = _draw_feature_index(
-        p, ratio_features_at_split, seed_sequence[i]
-    )
+    feature_index = _draw_feature_index(p, split_ratio, seed_sequence[i])
 
     ctree = fit_causaltree(
         X=X[resample_index][:, feature_index],
@@ -498,7 +520,7 @@ def predict_causalforest(cforest, X, num_workers):
     *num_workers* processes.
 
     Args:
-        cforest (pd.DataFrame): fitted causal forest represented in a multi-
+        cforest (pd.DataFrame): Fitted causal forest represented in a multi-
             index pd.DataFrame consisting of several fitted causal trees
         X (np.array): 2d array of new observations for which we predict the
             individual treatment effect.
@@ -531,9 +553,9 @@ def _assert_data_input_cforest(X, t, y):
     and all data has no missing valus.
 
     Args:
-        X: data on features
-        t: data on treatment status
-        y: data on outcomes
+        X: Data on features
+        t: Data on treatment status
+        y: Data on outcomes
 
     Returns: True if data satisfies all restrictions and raises Error otherwise
 
@@ -611,9 +633,9 @@ def _assert_df_is_valid_cforest(candidate_model):
     split_feat: int; split_value: float; treat_effect: float.
 
     Args:
-        candidate_model (pd.DataFrame): a data frame representing a causal
-            forest model, which might have columns that represent integer
-            dtypes but are stored as floats.
+        candidate_model (pd.DataFrame): Data frame representing a causal
+        forest model, which might have columns that represent integer dtypes
+        but are stored as floats.
 
     Returns: True if *candidate_model* constitutes a valid causal forest and
         raises Error otherwise.
@@ -675,12 +697,12 @@ def _update_dtypes(candidate_model):
     are set to integers.
 
     Args:
-        candidate_model (pd.DataFrame): a data frame representing a causal
-            forest model, which might have columns that represent integer
-            dtypes but are stored as floats.
+        candidate_model (pd.DataFrame): Data frame representing a causal
+        forest model, which might have columns that represent integer dtypes
+        but are stored as floats.
 
     Returns:
-        fitted_model (pd.DataFrame): updated model.
+        fitted_model (pd.DataFrame): Updated model.
 
     """
     columns_to_int = [
@@ -694,3 +716,55 @@ def _update_dtypes(candidate_model):
     fitted_model[columns_to_int] = fitted_model[columns_to_int].astype("Int64")
 
     return fitted_model
+
+
+def _check_init_inputs_causal_forest(
+    num_trees, split_ratio, min_leaf, max_depth, num_workers, seed_counter
+):
+    """Check inputs of init method of causal forest.
+
+    Args:
+        num_trees (int): Number of (causal) trees to use in the forest.
+        split_ratio (float): Ratio of features to (randomly) consider for each
+        tree. Has to be in the range [0, 1].
+        min_leaf (int): Minimum number of observations of each type (treated,
+        untreated) allowed in a leaf.
+        max_depth (int): Maximum depth a single tree is allowed to grow.
+        num_workers (int): Number of workers for parallelization.
+        seed_counter (int): Number where to start the seed counter.
+
+    Returns:
+        None
+
+    Raises:
+        ValueError, if an input is not valid.
+
+    """
+    if not isinstance(seed_counter, int) or seed_counter <= 0:
+        raise ValueError(
+            "Argument *seed_counter* needs to be a positive integer."
+        )
+
+    if not isinstance(num_trees, int) or num_trees <= 0:
+        raise ValueError(
+            "Argument *num_trees* needs to be a positive integer."
+        )
+
+    if not isinstance(split_ratio, float) and not (0 <= split_ratio <= 1):
+        raise ValueError(
+            "Argument *num_trees* needs to be of type float and"
+            "in the range [0, 1]."
+        )
+
+    if not isinstance(min_leaf, int) or min_leaf <= 0:
+        raise ValueError("Argument *min_leaf* needs to be a positive integer.")
+
+    if not isinstance(max_depth, int) or max_depth <= 0:
+        raise ValueError(
+            "Argument *max_depth* needs to be a positive integer."
+        )
+
+    if not isinstance(num_workers, int) or num_workers <= 0:
+        raise ValueError(
+            "Argument *num_workers* needs to be a positive integer."
+        )
