@@ -38,11 +38,10 @@ class CausalForest:
     Attributes:
         forestparams (dict):
             Hyperparameters for forest. Includes 'num_trees' (int) and
-            'split_ratio' (in [0, 1]) and 'num_workers'. Example:
+            'split_ratio' (in [0, 1]). Example:
             forestparams = {
                 'num_trees': 100,
                 'split_ratio': 0.7,
-                'num_workers': 4
             }
 
         treeparams (dict):
@@ -52,6 +51,9 @@ class CausalForest:
                 'min_leaf': 5,
                 'max_depth': 25
             }
+
+        num_workers (int):
+            Number of workers to use for the parallelization.
 
         _is_fitted (bool):
             True if the ``fit`` method was called or a fitted model was loaded
