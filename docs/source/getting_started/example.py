@@ -171,20 +171,21 @@ def plot_treatment_effect(alpha, scale, figsize):
     return ax
 
 
-def plot_predicted_treatment_effect(cf, figsize, npoints):
+def plot_predicted_treatment_effect(cf, figsize, npoints, num_workers):
     """Plot the predicted treatment effect from a Causal Forest.
 
     Args:
         cf (CausalForest): Fitted Causal Forest.
         figsize (tuple): The figure size.
         npoints (int): Number of points for meshgrid.
+        num_workers (int): Number of workers for parallelization.
 
     Returns:
         ax (matplotlib.axis): The finished plot.
 
     """
     X, Y = _construct_meshgrid(npoints=npoints)
-    Z = _predicted_treatment_effect_on_meshgrid(X, Y, cf)
+    Z = _predicted_treatment_effect_on_meshgrid(X, Y, cf, num_workers)
     ax = plot_3d_func(X, Y, Z, "Predicted Treatment Effect", figsize)
     return ax
 
@@ -269,7 +270,7 @@ def _true_treatment_effect_on_meshgrid(X, Y, alpha, scale):
     return Z
 
 
-def _predicted_treatment_effect_on_meshgrid(X, Y, cf):
+def _predicted_treatment_effect_on_meshgrid(X, Y, cf, num_workers):
     """Compute predicted treatment effect on meshgrid.
 
     Compute predicted treatment effect of Causal Forest *cf* on the first
@@ -279,6 +280,7 @@ def _predicted_treatment_effect_on_meshgrid(X, Y, cf):
         X (np.array): Meshgrid on first dimension.
         Y (np.array): Meshgrid on second dimension.
         cf (CausalForest): Fitted CausalForest object.
+        num_workers (int): Number of workers for parallelization.
 
     Returns:
         out (np.array): Meshgrid on predicted treatment effect.
@@ -291,5 +293,5 @@ def _predicted_treatment_effect_on_meshgrid(X, Y, cf):
     fill = np.zeros((n, k - 2))
     XY = np.concatenate((XY, fill), axis=1)
 
-    out = cf.predict(XY)
+    out = cf.predict(XY, num_workers)
     return out.reshape(X.shape)
