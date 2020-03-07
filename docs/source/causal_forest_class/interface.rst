@@ -14,3 +14,4 @@ over processes using `joblib <https://joblib.readthedocs.io/en/latest/>`__.
 .. currentmodule:: cforest.forest
 
 .. autoclass:: cforest.forest.CausalForest
+   :members:
