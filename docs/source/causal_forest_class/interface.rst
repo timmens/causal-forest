@@ -2,23 +2,15 @@
 CausalForest
 ============
 
-The CausalForest class can be initiated with parameters ``forestparams``,
-which denote the parameters that handle the behavior of the forest,
-``treeparams``, which denote the parameters that handle the behavior of the
-individual trees and ``seed_counter``, which denotes the number on which the
-seed generator starts producing seed sequences.
+The CausalForest class is initiated by setting the respective parameters
+which handle the behavior of the forest and trees.
+We control the randomness by incrementing seeds whenever randomness is
+needed, starting with an initial seed ``seed_counter`` which defaults to 1.
 
-If no values are passed the default values get used.
-
-.. code-block:: python
-
-   forestparams = {"num_trees": 100, "ratio_features_at_split": 0.7}
-
-   treeparams = {"min_leaf": 4, "max_depth": 25}
-
-   seed_counter = 1
+The fitting and prediction process can be parallelized using the
+``num_workers`` argument (default is 1), which triggers a parallelization
+over processes using `joblib <https://joblib.readthedocs.io/en/latest/>`__.
 
 .. currentmodule:: cforest.forest
 
 .. autoclass:: cforest.forest.CausalForest
-      :noindex:

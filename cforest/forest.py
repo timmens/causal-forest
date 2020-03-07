@@ -742,7 +742,7 @@ def _check_init_inputs_causal_forest(
         ValueError, if an input is not valid.
 
     """
-    if not isinstance(seed_counter, int) or seed_counter <= 0:
+    if not isinstance(seed_counter, int) or seed_counter < 0:
         raise ValueError(
             "Argument *seed_counter* needs to be a positive integer."
         )

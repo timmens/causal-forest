@@ -15,7 +15,3 @@ implements, namely the `fit`, `predict`, `save` and `load` methods.
    :maxdepth: 1
 
    interface
-   fit
-   predict
-   save
-   load
