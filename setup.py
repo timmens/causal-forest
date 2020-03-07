@@ -2,10 +2,10 @@ from setuptools import find_packages
 from setuptools import setup
 
 setup(
-    name="causal_forest",
+    name="cforest",
     version="0.0.1",
     description="Algorithm to estimate heterogeneous treatment effects.",
-    long_description="""The package causal_forest implements the causal
+    long_description="""The package cforest implements the causal
     forest algorithm from Athey and Wager (2018), which can be used to
     estimate heterogeneous treatment effects.""",
     license="MIT",

@@ -20,6 +20,7 @@ requirements:
     - numpy>=1.16.0
     - pandas>=0.24
     - numba>=0.12
+    - joblib>=0.14.1
 
 about:
   home: https://github.com/timmens/causal-forest

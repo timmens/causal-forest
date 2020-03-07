@@ -11,8 +11,7 @@ dependencies:
   - anaconda-client
   - conda-build
   - conda-verify
-    #- fuzzywuzzy
-    #- joblib
+  - joblib
   - jupyterlab
   - nbsphinx
   - numba >= 0.12
