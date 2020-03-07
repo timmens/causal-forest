@@ -15,3 +15,9 @@ over processes using `joblib <https://joblib.readthedocs.io/en/latest/>`__.
 
 .. autoclass:: cforest.forest.CausalForest
    :members:
+
+   .. automethod:: __init__
+   .. automethod:: fit
+   .. automethod:: predict
+   .. automethod:: save
+   .. automethod:: load
