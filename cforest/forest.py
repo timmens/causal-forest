@@ -79,6 +79,7 @@ class CausalForest:
         split_ratio,
         min_leaf,
         max_depth,
+        use_transformed_outcomes,
         num_workers=1,
         seed_counter=1,
     ):
@@ -106,6 +107,10 @@ class CausalForest:
             max_depth (int):
                 Maximum depth a single tree is allowed to grow.
 
+            use_transformed_outcomes (bool):
+                Should the transformed outcomes be used to evaluate goodness
+                of splits when building a tree.
+
             num_workers (int):
                 Number of workers for parallelization.
 
@@ -129,6 +134,7 @@ class CausalForest:
         self.treeparams = {
             "min_leaf": min_leaf,
             "max_depth": max_depth,
+            "use_transformed_outcomes": use_transformed_outcomes,
         }
         self.seed_counter = seed_counter
         self.num_workers = num_workers

@@ -37,6 +37,7 @@ def fit_causaltree(X, t, y, critparams=None):
         critparams = {
             "min_leaf": 4,
             "max_depth": 20,
+            "use_transformed_outcomes": False,
         }
 
     # initialize counter object and id_params
@@ -85,7 +86,7 @@ def _fit_node(X, t, y, index, critparams, idparams):
             of the data to consider for split.
         critparams (dict): dictionary containing information on when to stop
             splitting further, i.e., minimum number of leafs and maximum
-            depth of the tree.
+            depth of the tree, and if the transformed outcome should be used.
         idparams (dict): dictionary containing identification information of
             a single node. That is, a unique id number, the level in the tree,
             and a counter object which is passed to potential children of node.
@@ -100,7 +101,12 @@ def _fit_node(X, t, y, index, critparams, idparams):
     nodeid = idparams["id"]
 
     tmp = _find_optimal_split(
-        X=X, t=t, y=y, index=index, min_leaf=critparams["min_leaf"],
+        X=X,
+        t=t,
+        y=y,
+        index=index,
+        min_leaf=critparams["min_leaf"],
+        use_transformed_outcomes=critparams["use_transformed_outcomes"],
     )
 
     if tmp is None or level == critparams["max_depth"]:
@@ -153,7 +159,7 @@ def _fit_node(X, t, y, index, critparams, idparams):
         return out
 
 
-def _find_optimal_split(X, t, y, index, min_leaf):
+def _find_optimal_split(X, t, y, index, min_leaf, use_transformed_outcomes):
     """Compute optimal split and splitting information.
 
     For given data, for each feature, go through all valid splitting points and
@@ -168,6 +174,8 @@ def _find_optimal_split(X, t, y, index, min_leaf):
             of the data to consider for split.
         min_leaf (int): Minimum number of observations of each type (treated,
             untreated) allowed in a leaf; has to be greater than 1.
+        use_transformed_outcomes (bool): Use transformed outcomes for loss
+            approximation or simply return sum of squared estimates.
 
     Returns:
         left (np.array): boolean index representing the observations falling
@@ -207,6 +215,7 @@ def _find_optimal_split(X, t, y, index, min_leaf):
             y=yy,
             y_transformed=yy_transformed,
             min_leaf=min_leaf,
+            use_transformed_outcomes=use_transformed_outcomes,
         )
         jloss, jsplit_value, jsplit_index = tmp
 
@@ -230,7 +239,13 @@ def _find_optimal_split(X, t, y, index, min_leaf):
 
 @njit
 def _find_optimal_split_inner_loop(
-    splitting_indices, x, t, y, y_transformed, min_leaf
+    splitting_indices,
+    x,
+    t,
+    y,
+    y_transformed,
+    min_leaf,
+    use_transformed_outcomes,
 ):
     """Find the optimal splitting value for data on a single feature.
 
@@ -247,6 +262,8 @@ def _find_optimal_split_inner_loop(
         t (np.array): data on treatment status.
         y (np.array): data on outcomes.
         y_transformed (np.array): data on transformed outcomes.
+        use_transformed_outcomes (bool): Use transformed outcomes for loss
+            approximation or simply return sum of squared estimates.
 
     Returns:
          - (np.inf, None, None): if *splitting_indices* is empty
@@ -284,6 +301,7 @@ def _find_optimal_split_inner_loop(
         n_1r=n_1r,
         y_transformed=y_transformed,
         i=i0,
+        use_transformed_outcomes=use_transformed_outcomes,
     )
 
     for i in splitting_indices[1:]:
@@ -315,6 +333,7 @@ def _find_optimal_split_inner_loop(
             n_1r=n_1r,
             y_transformed=y_transformed,
             i=i,
+            use_transformed_outcomes=use_transformed_outcomes,
         )
         if global_loss < minimal_loss:
             split_value = x[i]
@@ -326,7 +345,17 @@ def _find_optimal_split_inner_loop(
 
 @njit
 def _compute_global_loss(
-    sum_1l, n_1l, sum_0l, n_0l, sum_1r, n_1r, sum_0r, n_0r, y_transformed, i
+    sum_1l,
+    n_1l,
+    sum_0l,
+    n_0l,
+    sum_1r,
+    n_1r,
+    sum_0r,
+    n_0r,
+    y_transformed,
+    i,
+    use_transformed_outcomes,
 ):
     """Compute global loss when splitting at index *i*.
 
@@ -352,6 +381,8 @@ def _compute_global_loss(
             split at index *i*.
         y_transformed (np.array): Transformed outcomes.
         i (int): Index at which to split.
+        use_transformed_outcomes (bool): Use transformed outcomes for loss
+            approximation or simply return sum of squared estimates.
 
     Returns:
         global_loss (float): The loss when splitting at index *i*.
@@ -360,8 +391,12 @@ def _compute_global_loss(
     left_te = _compute_treatment_effect_raw(sum_1l, n_1l, sum_0l, n_0l)
     right_te = _compute_treatment_effect_raw(sum_1r, n_1r, sum_0r, n_0r)
 
-    left_loss = ((y_transformed[: (i + 1)] - left_te) ** 2).sum()
-    right_loss = ((y_transformed[(i + 1) :] - right_te) ** 2).sum()
+    if use_transformed_outcomes:
+        left_loss = ((y_transformed[: (i + 1)] - left_te) ** 2).sum()
+        right_loss = ((y_transformed[(i + 1) :] - right_te) ** 2).sum()
+    else:
+        left_loss = (n_0l + n_1l) * left_te ** 2
+        right_loss = (n_0r + n_1r) * right_te ** 2
 
     global_loss = left_loss + right_loss
     return global_loss
