@@ -191,7 +191,7 @@ def _find_optimal_split(X, t, y, index, min_leaf, use_transformed_outcomes):
     split_feat = None
     split_value = None
     split_index = None
-    loss = np.inf
+    loss = np.inf if use_transformed_outcomes else -np.inf
 
     for j in range(p):
         # loop through features
@@ -219,14 +219,21 @@ def _find_optimal_split(X, t, y, index, min_leaf, use_transformed_outcomes):
         )
         jloss, jsplit_value, jsplit_index = tmp
 
-        if jloss < loss and jsplit_index is not None:
-            split_feat = j
-            split_value = jsplit_value
-            split_index = jsplit_index
-            loss = jloss
+        if use_transformed_outcomes:
+            if jloss < loss and jsplit_index is not None:
+                split_feat = j
+                split_value = jsplit_value
+                split_index = jsplit_index
+                loss = jloss
+        else:
+            if jloss > loss and jsplit_index is not None:
+                split_feat = j
+                split_value = jsplit_value
+                split_index = jsplit_index
+                loss = jloss
 
     # check if any split has occured.
-    if loss == np.inf:
+    if loss == np.inf or loss == -np.inf:
         return None
 
     # create index of observations falling in left and right leaf, respectively
@@ -335,10 +342,16 @@ def _find_optimal_split_inner_loop(
             i=i,
             use_transformed_outcomes=use_transformed_outcomes,
         )
-        if global_loss < minimal_loss:
-            split_value = x[i]
-            split_index = i
-            minimal_loss = global_loss
+        if use_transformed_outcomes:
+            if global_loss < minimal_loss:
+                split_value = x[i]
+                split_index = i
+                minimal_loss = global_loss
+        else:
+            if global_loss > minimal_loss:
+                split_value = x[i]
+                split_index = i
+                minimal_loss = global_loss
 
     return minimal_loss, split_value, split_index
 

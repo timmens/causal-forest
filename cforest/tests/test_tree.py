@@ -130,6 +130,7 @@ def test__compute_global_loss():
         n_0r=n_0r,
         y_transformed=y_transformed,
         i=i,
+        use_transformed_outcomes=True,
     )
     assert result == 160.0
 
@@ -159,6 +160,7 @@ def test__find_optimal_split_inner_loop():
         y=y,
         y_transformed=y_transformed,
         min_leaf=4,
+        use_transformed_outcomes=True,
     )
     _, split_value, split_index = result
 
@@ -180,7 +182,9 @@ def test__find_optimal_split():
     X = np.hstack((x.reshape((-1, 1)), unrelated_features))
     index = np.full((nobs,), True)
 
-    tmp = _find_optimal_split(X=X, t=t, y=y, index=index, min_leaf=4)
+    tmp = _find_optimal_split(
+        X=X, t=t, y=y, index=index, min_leaf=4, use_transformed_outcomes=False
+    )
     _, _, split_feat, _ = tmp
     assert split_feat == 0
 
